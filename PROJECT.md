@@ -86,7 +86,7 @@ Peach/
     ├── components/
     │   ├── ui/                 # shadcn/ui primitives — generated, not hand-edited
     │   ├── meetings-view.tsx   # the /meetings page: stats + form + list
-    │   ├── week-stats.tsx      # this week vs last week: meetings, hours, person-hours
+    │   ├── week-stats.tsx      # this week vs last week: meetings and hours
     │   ├── meeting-form.tsx, meeting-list.tsx, panel.tsx
     │   └── ...                 # template components: board, dashboard, header, auth screens
     ├── lib/

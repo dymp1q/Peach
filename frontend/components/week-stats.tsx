@@ -102,12 +102,12 @@ export function WeekStats({ meetings }: { meetings: Meeting[] }) {
           previous={previous.hours}
         />
         <StatCard
-          label="Person-hours"
-          hint="Hours × attendees"
+          label="Hours"
+          hint="Total this week"
           accent="border-l-accent-purple"
-          value={`${formatHours(current.personHours)} h`}
-          current={current.personHours}
-          previous={previous.personHours}
+          value={`${formatHours(current.hours)} h`}
+          current={current.hours}
+          previous={previous.hours}
         />
       </div>
     </Panel>
