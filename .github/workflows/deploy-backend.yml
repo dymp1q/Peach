@@ -1,7 +1,8 @@
 name: Deploy backend
 
-# Write "deploy" in a commit message on main and this ships the backend.
-# Nothing else on main triggers it, so ordinary commits stay cheap.
+# Every push to main: lint and test the backend, then ship it to ECS - build
+# the image, push it to ECR tagged with the commit SHA, and roll the ECS
+# service to that tag. A red test never reaches the deploy job.
 on:
   push:
     branches: [main]
@@ -14,14 +15,63 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Lambda
-    # GitHub compares strings case-insensitively, so "Deploy" and "redeployed"
-    # match too. Manual runs skip the check entirely.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.head_commit.message, 'deploy')
+  test:
+    name: Lint + test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    # The tests run against a real Postgres, as they do in Compose.
+    services:
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: peach
+          POSTGRES_PASSWORD: peach
+          POSTGRES_DB: peach
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U peach -d peach"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://peach:peach@localhost:5432/peach
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: ruff check
+        run: uv run ruff check --output-format=github .
+
+      - name: ruff format --check
+        run: uv run ruff format --check .
+
+      - name: migrations match the models
+        run: uv run alembic upgrade head && uv run alembic check
+
+      - name: pytest
+        run: uv run pytest -q
+
+  deploy:
+    name: ECS
+    needs: test
+    # Skipped until make github-role has created the role and set this variable.
+    if: vars.AWS_DEPLOY_ROLE_ARN != ''
+    # Fargate runs the task on ARM64 (Graviton); an ARM runner builds the
+    # image natively instead of under QEMU emulation.
+    runs-on: ubuntu-24.04-arm
     permissions:
       # Required to fetch the OIDC token that AWS trades for the role. The job
       # holds no long-lived credentials.
@@ -37,26 +87,23 @@ jobs:
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
           role-session-name: gha-deploy-backend-${{ github.run_id }}
 
-      # The function runs on arm64 and this runner is x86, so the image is
-      # built under emulation. Swapping to a `ubuntu-24.04-arm`
-      # runner makes it native, and these two steps unnecessary.
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
+      # The same target you run locally - CI has no recipe of its own.
       - name: Deploy
         run: make deploy-backend
         env:
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-          # There is no .env here. Everything else falls back to the script's
-          # defaults, and any parameter left empty keeps whatever the stack
-          # already has - so a deploy from CI will not undo CORS settings.
+          # There is no .env here. Any parameter left empty keeps the stack's
+          # current value, so a deploy from CI does not undo CORS or the domain.
           PROJECT_NAME: ${{ vars.PROJECT_NAME }}
+          IMAGE_TAG: ${{ github.sha }}
 
       - name: Summary
         if: always()
         run: |
           API_URL=$(aws cloudformation describe-stacks \
-            --stack-name "${PROJECT_NAME:-peach}-backend" \
+            --stack-name "${PROJECT_NAME:-peach}-backend-ecs" \
             --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
             --output text 2>/dev/null || echo "unknown")
           {
@@ -64,7 +111,8 @@ jobs:
             echo
             echo "| | |"
             echo "|---|---|"
-            echo "| commit | \`${GITHUB_SHA::12}\` |"
+            echo "| commit | \`${GITHUB_SHA}\` |"
+            echo "| image tag | \`${GITHUB_SHA}\` |"
             echo "| api | ${API_URL} |"
             echo "| result | ${{ job.status }} |"
           } >> "$GITHUB_STEP_SUMMARY"

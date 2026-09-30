@@ -52,10 +52,12 @@ Peach/
 ├── docker-compose.yml          # db, backend, frontend
 ├── docker-compose.override.yml # development only: bind mounts + hot reload (auto-loaded)
 ├── Makefile                    # thin wrappers over compose and the deploy scripts
-├── .github/workflows/          # lint on every push; backend deploy on "deploy" commits
-├── infra/                      # CloudFormation: backend (Lambda + Aurora), frontend (S3 +
-│                               #   CloudFront), cognito (user pool), github-oidc (CI role)
-├── scripts/                    # deploy-*/destroy-* for backend, frontend, cognito; domain; role
+├── .github/workflows/          # lint on every push; test + backend deploy to ECS on every push to main
+├── infra/                      # CloudFormation: backend-ecs (ALB + ECS Fargate + RDS), frontend
+│                               #   (S3 + CloudFront), cognito, github-oidc (CI role); backend.yaml
+│                               #   is the template's Lambda + Aurora path, kept as an alternative
+├── scripts/                    # deploy-*/destroy-*/domain-* for backend (ECS), frontend, cognito;
+│                               #   deploy-backend.sh = the Lambda path; github-role.sh
 │
 ├── backend/                    # the HTTP API (FastAPI)
 │   ├── Dockerfile              # builder / dev / runtime / lambda stages
@@ -168,8 +170,9 @@ Schema changes land only through an Alembic revision, never `Base.metadata.creat
 only). A running product's database has rows in it; a migration is a versioned, reviewable,
 reversible change to that schema — `create_all` only creates what is missing and cannot alter or
 undo anything. Migrations run **at container start** (`entrypoint.sh`, or the override's
-command in development) and, on Lambda, through the deploy script's `{"action": "migrate"}`
-invoke — never at image build time, when no database exists.
+command in development) — on ECS every new task runs `alembic upgrade head` before uvicorn starts
+(and on the Lambda path, the deploy script's `{"action": "migrate"}` invoke). Never at image build
+time, when no database exists.
 
 ---
 
@@ -211,3 +214,19 @@ Everything else: exact versions in `backend/uv.lock` and `frontend/pnpm-lock.yam
 - Backend: `ruff check`, `ruff format --check`, `pytest`, `alembic check` (models = migrations).
 - Frontend: `eslint`, `prettier --check`, `next typegen` + `tsc --noEmit`, `vitest`.
 - CI (`.github/workflows/lint.yml`) runs the linters and type check on every push.
+- CD (`.github/workflows/deploy-backend.yml`): every push to `main` runs the backend lint + tests,
+  then `make deploy-backend` - image to ECR tagged with the commit SHA, ECS service rolled to it.
+
+---
+
+## 9. Deployment (AWS)
+
+| part     | where                                               | address                     |
+|----------|-----------------------------------------------------|-----------------------------|
+| frontend | static export in a private S3 bucket, behind CloudFront (HTTPS) | `https://app.<domain>` |
+| backend  | ECS service on Fargate behind an Application Load Balancer (HTTPS) | `https://api.<domain>` |
+| database | RDS PostgreSQL, reachable from the backend tasks only | —                          |
+
+The Makefile is the deploy contract: `make deploy-frontend` and `make deploy-backend` are exactly
+what CI runs. GitHub Actions authenticates with OIDC (`make github-role`): a role trusted only for
+`repo:<owner>/<repo>:ref:refs/heads/main`, no access key stored anywhere.

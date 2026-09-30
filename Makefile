@@ -1,9 +1,9 @@
 COMPOSE := docker compose
 
-.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-cognito destroy-cognito deploy-backend destroy-backend logs-backend migrate-backend cert domain deploy-frontend destroy-frontend github-role
+.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-cognito destroy-cognito deploy-backend destroy-backend logs-backend migrate-backend domain-backend deploy-backend-lambda destroy-backend-lambda logs-backend-lambda migrate-backend-lambda cert domain deploy-frontend destroy-frontend github-role
 
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 
 up: ## Start the whole stack (detached)
 	$(COMPOSE) up -d --build
@@ -57,16 +57,36 @@ deploy-cognito: ## Create/update the Cognito user pool; writes COGNITO_* to .env
 destroy-cognito: ## Delete the Cognito stack, every account in the pool included
 	./scripts/destroy-cognito.sh
 
-deploy-backend: ## Build + push the image, roll the Lambda (function URL + Aurora), migrate, write BACKEND_URL to .env
+# --- backend on ECS (lab 2): ALB -> Fargate -> RDS ---
+
+deploy-backend: ## Build the image, push it to ECR tagged with the commit SHA, roll the ECS service
+	./scripts/deploy-backend-ecs.sh
+
+domain-backend: ## HTTPS on your domain for the API's load balancer: make domain-backend DOMAIN=api.example.com
+	./scripts/domain-backend.sh domain
+
+destroy-backend: ## Delete the ECS backend: load balancer, service, RDS database (ECR_TOO=1 for images)
+	./scripts/destroy-backend-ecs.sh
+
+logs-backend: ## Tail the ECS backend's CloudWatch logs
+	aws logs tail /ecs/$${PROJECT_NAME:-peach}-backend --follow --since 10m
+
+migrate-backend: ## Re-run migrations: restart the tasks, whose entrypoint runs alembic upgrade head
+	aws ecs update-service --cluster $${PROJECT_NAME:-peach} --service $${PROJECT_NAME:-peach}-backend \
+		--force-new-deployment --query 'service.deployments[0].status' --output text
+
+# --- backend on Lambda (the course template's original path) ---
+
+deploy-backend-lambda: ## Build + push the image, roll the Lambda (function URL + Aurora), migrate, write BACKEND_URL to .env
 	./scripts/deploy-backend.sh
 
-destroy-backend: ## Delete the backend stack, Aurora cluster included
+destroy-backend-lambda: ## Delete the Lambda backend stack, Aurora cluster included
 	./scripts/destroy-backend.sh
 
-logs-backend: ## Tail the deployed backend's CloudWatch logs
+logs-backend-lambda: ## Tail the Lambda backend's CloudWatch logs
 	aws logs tail /aws/lambda/$${PROJECT_NAME:-peach}-backend --follow --since 10m
 
-migrate-backend: ## Re-run migrations on the deployed backend (deploy-backend already does)
+migrate-backend-lambda: ## Re-run migrations on the Lambda backend (deploy-backend-lambda already does)
 	aws lambda invoke --function-name $${PROJECT_NAME:-peach}-backend \
 		--cli-binary-format raw-in-base64-out --payload '{"action":"migrate"}' /dev/stdout
 

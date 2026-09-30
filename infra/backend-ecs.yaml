@@ -1,0 +1,445 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  The backend as a container: an Application Load Balancer in front, the
+  FastAPI image running as an ECS service on Fargate, and PostgreSQL on RDS
+  behind it. Optionally a custom domain with HTTPS on the load balancer.
+
+  internet -> ALB :443 (HTTPS, ACM certificate; :80 redirects)
+           -> target group (health check GET /health)
+           -> ECS service on Fargate (container :8000)
+           -> RDS PostgreSQL :5432
+
+  Deployed by scripts/deploy-backend-ecs.sh (make deploy-backend); the domain
+  is attached separately by scripts/domain-backend.sh (make domain-backend).
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: peach
+    AllowedPattern: "[a-z0-9-]+"
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: >-
+      Public subnets in at least two availability zones - the load balancer and
+      the database subnet group both require two. Tasks get a public IP here, so
+      they can pull from ECR without a NAT gateway (which bills by the hour).
+
+  ImageUri:
+    Type: String
+    Description: The image to run, tagged with the commit SHA it was built from.
+
+  Cpu:
+    Type: String
+    Default: "256"
+    Description: Task CPU units (256 = 0.25 vCPU), the smallest Fargate size.
+
+  Memory:
+    Type: String
+    Default: "512"
+    Description: Task memory in MiB.
+
+  DesiredCount:
+    Type: Number
+    Default: 1
+    MinValue: 0
+
+  DbName:
+    Type: String
+    Default: peach
+
+  DbUsername:
+    Type: String
+    Default: peach
+
+  DbPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+
+  DbEngineVersion:
+    Type: String
+    Default: "17"
+    Description: Major version only; RDS picks its current default minor.
+
+  DbAllocatedStorage:
+    Type: Number
+    Default: 20
+
+  AppEnv:
+    Type: String
+    Default: production
+
+  LogLevel:
+    Type: String
+    Default: info
+
+  CorsOrigins:
+    Type: String
+    Default: "*"
+    Description: Comma-separated browser origins; set this to the deployed frontend URL.
+
+  CognitoUserPoolId:
+    Type: String
+    Default: ""
+    Description: >-
+      From make deploy-cognito. Empty means no pool: every /api/v1 endpoint then
+      answers 503, never an open door. Meetings do not need it.
+
+  CognitoClientId:
+    Type: String
+    Default: ""
+
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+
+  DomainName:
+    Type: String
+    Default: ""
+    Description: e.g. api.example.com. Set by make domain-backend.
+
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: An ISSUED ACM certificate for DomainName, in this stack's region.
+
+  HostedZoneId:
+    Type: String
+    Default: ""
+    Description: Route 53 zone for DomainName; empty when DNS lives elsewhere.
+
+Conditions:
+  HasCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
+  HasDomain: !And
+    - !Not [!Equals [!Ref DomainName, ""]]
+    - !Condition HasCertificate
+  HasZoneRecord: !And
+    - !Condition HasDomain
+    - !Not [!Equals [!Ref HostedZoneId, ""]]
+
+Resources:
+  # --- network: who may talk to whom ----------------------------------------
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${ProjectName} load balancer - the only public entry"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIpv6: "::/0" }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIpv6: "::/0" }
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  ServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${ProjectName} backend tasks - reachable from the load balancer only"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${ProjectName} database - reachable from the backend tasks only"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref ServiceSecurityGroup
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  # --- database -------------------------------------------------------------
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub "${ProjectName} ECS backend database"
+      SubnetIds: !Ref SubnetIds
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  # Deleted with the stack: this is a course project, and a teardown that
+  # leaves a billed database behind is worse than losing test data.
+  Db:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Snapshot
+    Metadata:
+      cfn-lint:
+        config:
+          # The password is a NoEcho parameter, passed through a 0600 file and
+          # read back from DatabaseUrlSecret on later deploys - the same scheme
+          # as infra/backend.yaml. It is needed in plain form to compose the URL.
+          ignore_checks: [W1011]
+    Properties:
+      DBInstanceIdentifier: !Sub "${ProjectName}-ecs-db"
+      Engine: postgres
+      EngineVersion: !Ref DbEngineVersion
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: !Ref DbAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      DBName: !Ref DbName
+      MasterUsername: !Ref DbUsername
+      MasterUserPassword: !Ref DbPassword
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VPCSecurityGroups: [!Ref DbSecurityGroup]
+      PubliclyAccessible: false
+      MultiAZ: false
+      BackupRetentionPeriod: 1
+      DeletionProtection: false
+      AutoMinorVersionUpgrade: true
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  # The task reads DATABASE_URL from here at start; it never appears in the
+  # task definition or in the console as plain text.
+  DatabaseUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/backend-ecs/database-url"
+      Description: SQLAlchemy URL the ECS backend connects with.
+      SecretString: !Sub
+        - "postgresql+asyncpg://${DbUsername}:${DbPassword}@${Endpoint}:${Port}/${DbName}"
+        - Endpoint: !GetAtt Db.Endpoint.Address
+          Port: !GetAtt Db.Endpoint.Port
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  # --- the container --------------------------------------------------------
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/ecs/${ProjectName}-backend"
+      RetentionInDays: !Ref LogRetentionDays
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ProjectName
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  # Used by ECS itself, before the app runs: pull the image, read the secret,
+  # write logs. The app needs no AWS access, so there is no task role.
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-ecs-execution"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: read-database-url
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref DatabaseUrlSecret
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ProjectName}-backend"
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref Cpu
+      Memory: !Ref Memory
+      # Graviton: about 20% cheaper than x86 on Fargate. The image is built for it.
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: backend
+          Image: !Ref ImageUri
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8000
+              Protocol: tcp
+          # The image's default command is scripts/entrypoint.sh: it applies
+          # migrations (alembic upgrade head) and then starts uvicorn.
+          Environment:
+            - { Name: APP_ENV, Value: !Ref AppEnv }
+            - { Name: LOG_LEVEL, Value: !Ref LogLevel }
+            - { Name: CORS_ORIGINS, Value: !Ref CorsOrigins }
+            - { Name: COGNITO_REGION, Value: !Ref AWS::Region }
+            - { Name: COGNITO_USER_POOL_ID, Value: !Ref CognitoUserPoolId }
+            - { Name: COGNITO_CLIENT_ID, Value: !Ref CognitoClientId }
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrlSecret
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: backend
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  # --- the load balancer ----------------------------------------------------
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${ProjectName}-backend"
+      Type: application
+      Scheme: internet-facing
+      Subnets: !Ref SubnetIds
+      SecurityGroups: [!Ref LoadBalancerSecurityGroup]
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  # Fargate tasks register by IP. A task that fails the health check three
+  # times in a row stops receiving traffic, and ECS replaces it.
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${ProjectName}-backend"
+      TargetType: ip
+      Protocol: HTTP
+      Port: 8000
+      VpcId: !Ref VpcId
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 15
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: "200"
+      TargetGroupAttributes:
+        # Old tasks get 30 s to finish in-flight requests, not the default 300.
+        - Key: deregistration_delay.timeout_seconds
+          Value: "30"
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  # With a certificate, :80 only redirects to HTTPS. Without one (the first
+  # deploy, before make domain-backend) it serves plain HTTP.
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions: !If
+        - HasCertificate
+        - - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: "443"
+              StatusCode: HTTP_301
+        - - Type: forward
+            TargetGroupArn: !Ref TargetGroup
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCertificate
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # --- the service ----------------------------------------------------------
+
+  Service:
+    Type: AWS::ECS::Service
+    # The target group has to be attached to the load balancer first.
+    DependsOn: HttpListener
+    Properties:
+      ServiceName: !Sub "${ProjectName}-backend"
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      # Time for migrations and uvicorn to start before health checks count.
+      HealthCheckGracePeriodSeconds: 60
+      DeploymentConfiguration:
+        # Rolling: start the new task, wait until it is healthy, then stop the old.
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        # A new image that never becomes healthy is rolled back automatically.
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: !Ref SubnetIds
+          SecurityGroups: [!Ref ServiceSecurityGroup]
+      LoadBalancers:
+        - ContainerName: backend
+          ContainerPort: 8000
+          TargetGroupArn: !Ref TargetGroup
+      Tags:
+        - { Key: PROJECT_NAME, Value: !Ref ProjectName }
+
+  # --- DNS ------------------------------------------------------------------
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasZoneRecord
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt LoadBalancer.DNSName
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+
+Outputs:
+  ApiUrl:
+    Description: Where the API answers - the custom domain once it has one.
+    Value: !If
+      - HasDomain
+      - !Sub "https://${DomainName}"
+      - !Sub "http://${LoadBalancer.DNSName}"
+  LoadBalancerDnsName:
+    Value: !GetAtt LoadBalancer.DNSName
+  ClusterName:
+    Value: !Ref Cluster
+  ServiceName:
+    Value: !GetAtt Service.Name
+  LogGroupName:
+    Value: !Ref LogGroup
+  DatabaseEndpoint:
+    Value: !GetAtt Db.Endpoint.Address
+  DatabaseUrlSecretArn:
+    Value: !Ref DatabaseUrlSecret

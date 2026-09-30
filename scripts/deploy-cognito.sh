@@ -97,8 +97,11 @@ PARAMS_FILE="$(mktemp)"
 chmod 600 "${PARAMS_FILE}"
 trap 'rm -f "${PARAMS_FILE}"' EXIT
 
+# Hosted-domain prefixes are global across AWS; the account id keeps ours unique.
+DOMAIN_PREFIX="${COGNITO_DOMAIN_PREFIX:-${PROJECT_NAME}-${ACCOUNT_ID}}"
+
 PROJECT_NAME="${PROJECT_NAME}" \
-DOMAIN_PREFIX="${COGNITO_DOMAIN_PREFIX:-${PROJECT_NAME}-${ACCOUNT_ID}}" \
+DOMAIN_PREFIX="${DOMAIN_PREFIX}" \
 CALLBACKS="${CALLBACKS%,}" \
 LOGOUTS="${LOGOUTS%,}" \
 GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \

@@ -387,6 +387,56 @@ The generated project was checked end to end:
 | Production stack | `docker compose -f docker-compose.yml up --build` | all three services healthy |
 | UI round trip | create → edit → delete an item in the browser | row confirmed in Postgres at each step |
 
+## 11a. Deploying the backend to ECS (lab 2)
+
+`make deploy-backend` now ships the backend the way lab 2 asks for: a container on **ECS Fargate
+behind an Application Load Balancer**, PostgreSQL on **RDS**. The Lambda path in §11 is still there,
+unchanged, as `make deploy-backend-lambda` (and `destroy-`, `logs-`, `migrate-backend-lambda`).
+
+```
+internet -> ALB :443 (ACM certificate; :80 redirects) -> target group, health check GET /health
+         -> ECS service on Fargate (ARM64, 0.25 vCPU / 512 MB, container :8000)
+         -> RDS PostgreSQL 17 (db.t4g.micro), reachable from the tasks only
+```
+
+```bash
+make deploy-backend                         # build -> ECR (tag = commit SHA) -> CloudFormation -> ECS
+make domain-backend DOMAIN=api.example.com  # ACM certificate + HTTPS listener + DNS for the API
+make logs-backend                           # tail the containers' logs
+make destroy-backend                        # delete it all, database included (ECR_TOO=1 for images)
+```
+
+`infra/backend-ecs.yaml` is the whole thing in one stack; `scripts/deploy-backend-ecs.sh` drives it:
+
+1. builds the Dockerfile's `runtime` stage for `linux/arm64` and pushes it to ECR tagged with
+   the **commit SHA** - never `latest`, so the running version is always known and a rollback is
+   "deploy the previous SHA";
+2. deploys the stack with the new image. ECS starts a task on it, the task's entrypoint runs
+   `alembic upgrade head` and starts uvicorn, and only once the load balancer's health check
+   passes is the old task stopped. An image that never becomes healthy is rolled back by the
+   deployment circuit breaker;
+3. writes the API URL into `.env` as `BACKEND_URL` - `http://<alb>` at first, then
+   `https://api.example.com` after `make domain-backend`, which is what `make deploy-frontend`
+   needs.
+
+**The domain.** `make domain-backend` requests an ACM certificate in the stack's region (a load
+balancer takes certificates only from its own region), proves domain ownership with ACM's
+validation CNAME, then attaches the certificate to a :443 listener and turns :80 into a redirect.
+With the zone in Route 53 it also creates the alias record; otherwise it prints the CNAME to add.
+
+**No NAT gateway.** Tasks run in the default VPC's public subnets with a public IP, so they pull
+from ECR and read Secrets Manager directly. Their security group only accepts :8000 from the load
+balancer, and the database only accepts :5432 from the tasks.
+
+**What it costs** (us-east-1, roughly): ALB ~$0.55/day, one Fargate task ~$0.25/day, RDS
+db.t4g.micro ~$0.40/day plus storage - **about $1.2/day while it exists**. It bills whether anyone
+visits or not: `make destroy-backend` when you are done.
+
+**CI.** `.github/workflows/deploy-backend.yml` now runs on **every push to `main`**: ruff, the
+migrations check and pytest against a Postgres service, then - only if they pass - `make
+deploy-backend` on an ARM runner, with the commit SHA as the tag. The deploy job is skipped until
+`make github-role` has set `AWS_DEPLOY_ROLE_ARN`.
+
 ## 11. Deploying the backend to AWS
 
 Sign-in comes first: `make deploy-cognito` creates the user pool, app client and hosted domain

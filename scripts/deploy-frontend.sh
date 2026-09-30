@@ -63,13 +63,15 @@ API_URL="${API_URL%/}"
 
 log "building against ${API_URL}"
 
-# The Cognito ids are compiled in too; without them nobody could sign in.
+# The Cognito ids are compiled in too; without them nobody can sign in. The
+# public pages (meetings) still work, so this warns rather than stops.
 [[ -n "${COGNITO_CLIENT_ID:-}" && -n "${COGNITO_DOMAIN:-}" ]] \
-  || die "COGNITO_CLIENT_ID / COGNITO_DOMAIN are not set in .env - run make deploy-cognito first"
+  || warn "COGNITO_CLIENT_ID / COGNITO_DOMAIN are not set - sign-in stays off until make deploy-cognito"
 
-# The function URL is always HTTPS; plain HTTP here means a hand-edited .env.
+# The ECS backend is plain http:// until make domain-backend gives it a domain
+# and a certificate; browsers block an HTTPS page calling HTTP.
 [[ "${API_URL}" == https://* ]] \
-  || die "BACKEND_URL must be https:// - browsers block an HTTPS page calling HTTP"
+  || die "BACKEND_URL must be https:// - run make domain-backend DOMAIN=api.example.com first"
 
 # --- infrastructure ---------------------------------------------------------
 

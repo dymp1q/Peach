@@ -178,6 +178,7 @@ Resources:
                   - !Sub "arn:aws:rds:*:${AWS::AccountId}:subgrp:*"
                   - !Sub "arn:aws:rds:*:${AWS::AccountId}:cluster-pg:*"
                   - !Sub "arn:aws:rds:*:${AWS::AccountId}:pg:*"
+                  - !Sub "arn:aws:rds:*:${AWS::AccountId}:og:*"
 
               - Sid: DatabaseDescribe
                 Effect: Allow
@@ -197,6 +198,42 @@ Resources:
                   - secretsmanager:TagResource
                   - secretsmanager:UpdateSecret
                 Resource: !Sub "arn:aws:secretsmanager:*:${AWS::AccountId}:secret:${ProjectName}/*"
+
+              # The ECS backend (infra/backend-ecs.yaml). RegisterTaskDefinition
+              # and most Describe calls accept no resource-level permissions.
+              - Sid: Containers
+                Effect: Allow
+                Action: ecs:*
+                Resource: "*"
+
+              - Sid: LoadBalancer
+                Effect: Allow
+                Action: elasticloadbalancing:*
+                Resource: "*"
+
+              # ECS and the load balancer create these once per account.
+              - Sid: ServiceLinkedRoles
+                Effect: Allow
+                Action: iam:CreateServiceLinkedRole
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    iam:AWSServiceName:
+                      - ecs.amazonaws.com
+                      - elasticloadbalancing.amazonaws.com
+                      - rds.amazonaws.com
+
+              # The API's alias record, when the domain's zone is in Route 53.
+              - Sid: Dns
+                Effect: Allow
+                Action:
+                  - route53:ChangeResourceRecordSets
+                  - route53:GetChange
+                  - route53:GetHostedZone
+                  - route53:ListResourceRecordSets
+                Resource:
+                  - arn:aws:route53:::hostedzone/*
+                  - arn:aws:route53:::change/*
 
               - Sid: Logs
                 Effect: Allow
