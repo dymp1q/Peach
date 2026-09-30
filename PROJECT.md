@@ -27,15 +27,17 @@ one tree.
 
 ## 2. Scope of the first Spry slice
 
-- The backend exposes `GET /api/meetings` (list) and `POST /api/meetings` (create one).
+- The backend exposes `GET /api/meetings` (list), `POST /api/meetings` (create one) and
+  `DELETE /api/meetings/{id}` (delete one).
 - A meeting has: `id`, `title`, `starts_at`, `ends_at`, `attendee_count`.
 - The frontend has one page, `/meetings`, that lists meetings and has a form that adds a new one,
-  plus this week's numbers compared with last week.
+  plus this week's numbers compared with last week. Each meeting in the list can be deleted,
+  after a confirmation dialog.
 - `docker compose up --build` is the only command a new developer runs (after Docker Desktop).
 - Meetings need **no sign-in** in this slice. Everything the template already had (items, the
   board, the dashboard, Cognito sign-in, AWS deployment) stays as it is.
 
-Deliberately **not** added: editing or deleting meetings, pagination, caches, queues, extra
+Deliberately **not** added: editing meetings, pagination, caches, queues, extra
 reverse proxies, a second database.
 
 ---
@@ -125,6 +127,11 @@ MeetingCreate
 Meeting = MeetingCreate +
   id              integer  assigned by the database
 ```
+
+### `DELETE /api/meetings/{id}`
+
+`204` with no body. No such meeting (or already deleted) → `404` `{"detail": "Meeting not found"}`.
+Deletion is permanent: there is no undo and no soft-delete flag.
 
 ```json
 {

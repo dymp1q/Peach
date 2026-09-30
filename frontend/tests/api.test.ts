@@ -59,6 +59,22 @@ describe("api", () => {
     expect(signOut).toHaveBeenCalled();
   });
 
+  it("deletes a meeting without sending a token", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => undefined,
+    } as Response);
+    await expect(api.deleteMeeting(7)).resolves.toBeUndefined();
+    const [url, init] = spy.mock.calls[0];
+    expect(url).toContain("/api/meetings/7");
+    expect(init?.method).toBe("DELETE");
+    expect(
+      (init?.headers as Record<string, string>).Authorization,
+    ).toBeUndefined();
+    expect(getIdToken).not.toHaveBeenCalled();
+  });
+
   it("raises ApiError when the network is unreachable", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
       throw new TypeError("failed");

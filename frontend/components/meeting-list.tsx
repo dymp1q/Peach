@@ -1,6 +1,7 @@
-import { CalendarX2, Users } from "lucide-react";
+import { CalendarX2, Trash2, Users } from "lucide-react";
 
 import { Panel } from "@/components/panel";
+import { Button } from "@/components/ui/button";
 import type { Meeting } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,15 @@ function formatDuration(start: Date, end: Date): string {
   return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
 }
 
-function MeetingCard({ meeting, now }: { meeting: Meeting; now: Date }) {
+function MeetingCard({
+  meeting,
+  now,
+  onDelete,
+}: {
+  meeting: Meeting;
+  now: Date;
+  onDelete: (meeting: Meeting) => void;
+}) {
   const start = new Date(meeting.starts_at);
   const end = new Date(meeting.ends_at);
   const past = end < now;
@@ -41,13 +50,26 @@ function MeetingCard({ meeting, now }: { meeting: Meeting; now: Date }) {
           {formatDuration(start, end)}
         </p>
       </div>
-      <span
-        className="flex shrink-0 items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground"
-        title={`${meeting.attendee_count} attendees`}
-      >
-        <Users className="size-3.5" />
-        {meeting.attendee_count}
-      </span>
+      <div className="flex shrink-0 items-center gap-1">
+        <span
+          className="flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground"
+          title={`${meeting.attendee_count} attendees`}
+        >
+          <Users className="size-3.5" />
+          {meeting.attendee_count}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground hover:text-destructive"
+          aria-label={`Delete ${meeting.title}`}
+          title="Delete"
+          onClick={() => onDelete(meeting)}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -56,10 +78,12 @@ export function MeetingList({
   meetings,
   loading,
   error,
+  onDelete,
 }: {
   meetings: Meeting[];
   loading: boolean;
   error: string | null;
+  onDelete: (meeting: Meeting) => void;
 }) {
   const now = new Date();
 
@@ -88,7 +112,7 @@ export function MeetingList({
         <ul className="flex flex-col gap-2">
           {meetings.map((meeting) => (
             <li key={meeting.id}>
-              <MeetingCard meeting={meeting} now={now} />
+              <MeetingCard meeting={meeting} now={now} onDelete={onDelete} />
             </li>
           ))}
         </ul>

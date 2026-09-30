@@ -17,3 +17,13 @@ async def create_meeting(session: AsyncSession, payload: MeetingCreate) -> Meeti
     session.add(meeting)
     await session.flush()
     return meeting
+
+
+async def delete_meeting(session: AsyncSession, meeting_id: int) -> bool:
+    """Delete one meeting; False if there was no such meeting."""
+    meeting = await session.get(Meeting, meeting_id)
+    if meeting is None:
+        return False
+    await session.delete(meeting)
+    await session.flush()
+    return True

@@ -244,6 +244,7 @@ updated_at: datetime
 |--------|------|------|---------|
 | `GET` | `/api/meetings` | — | `200` `Meeting[]`, ordered by `starts_at` |
 | `POST` | `/api/meetings` | `MeetingCreate` | `201` `Meeting` |
+| `DELETE` | `/api/meetings/{id}` | — | `204`, `404` if missing |
 
 No sign-in needed. `Meeting` is `{id, title, starts_at, ends_at, attendee_count}`, datetimes in
 UTC with a `Z`. The full contract, the table and the page (`/meetings`) are in

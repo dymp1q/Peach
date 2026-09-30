@@ -167,4 +167,12 @@ export const api = {
       { method: "POST", body: JSON.stringify(payload) },
       { auth: false },
     ),
+
+  deleteMeeting: (id: number) =>
+    request(
+      `/api/meetings/${id}`,
+      z.undefined(),
+      { method: "DELETE" },
+      { auth: false },
+    ),
 };

@@ -77,3 +77,26 @@ async def test_invalid_meeting_is_rejected(client: AsyncClient, overrides: dict)
     assert response.status_code == 422
     listed = await client.get("/api/meetings")
     assert listed.json() == []
+
+
+async def test_delete_returns_204_and_removes_it(client: AsyncClient) -> None:
+    keep = (await client.post("/api/meetings", json=_meeting(title="Keep"))).json()
+    doomed = (await client.post("/api/meetings", json=_meeting(title="Doomed"))).json()
+
+    response = await client.delete(f"/api/meetings/{doomed['id']}")
+    assert response.status_code == 204
+
+    listed = (await client.get("/api/meetings")).json()
+    assert [m["id"] for m in listed] == [keep["id"]]
+
+
+async def test_delete_missing_returns_404(client: AsyncClient) -> None:
+    response = await client.delete("/api/meetings/999999")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Meeting not found"
+
+
+async def test_delete_twice_is_404_the_second_time(client: AsyncClient) -> None:
+    created = (await client.post("/api/meetings", json=_meeting())).json()
+    assert (await client.delete(f"/api/meetings/{created['id']}")).status_code == 204
+    assert (await client.delete(f"/api/meetings/{created['id']}")).status_code == 404

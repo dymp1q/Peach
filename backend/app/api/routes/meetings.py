@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 from app.db import SessionDep
 from app.schemas import MeetingCreate, MeetingRead
@@ -22,3 +22,14 @@ async def list_meetings(session: SessionDep) -> list[MeetingRead]:
 async def create_meeting(payload: MeetingCreate, session: SessionDep) -> MeetingRead:
     meeting = await meetings_service.create_meeting(session, payload)
     return MeetingRead.model_validate(meeting)
+
+
+@router.delete(
+    "/{meeting_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a meeting",
+)
+async def delete_meeting(meeting_id: int, session: SessionDep) -> Response:
+    if not await meetings_service.delete_meeting(session, meeting_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
