@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 const links = [
   { href: "/home", label: "Home" },
   { href: "/items", label: "Board" },
+  { href: "/meetings", label: "Meetings" },
 ];
 
 export function SiteHeader() {
@@ -24,12 +25,12 @@ export function SiteHeader() {
         <Link href="/home" className="flex items-center gap-2">
           <span
             aria-hidden
-            className="grid size-6 place-items-center rounded-md bg-foreground font-heading text-[13px] leading-none font-semibold text-background"
+            className="grid size-6 place-items-center rounded-md bg-primary font-heading text-[13px] leading-none font-semibold text-primary-foreground"
           >
-            P
+            S
           </span>
           <span className="font-heading text-[15px] font-semibold tracking-tight">
-            Peach
+            Spry
           </span>
         </Link>
 
@@ -58,7 +59,7 @@ export function SiteHeader() {
           <div className="ml-auto flex items-center gap-2">
             <span
               aria-hidden
-              className="grid size-6 place-items-center rounded-full bg-tint-peach text-xs font-semibold text-tint-peach-foreground"
+              className="grid size-6 place-items-center rounded-full bg-tint-green text-xs font-semibold text-tint-green-foreground"
             >
               {session.name.charAt(0).toUpperCase()}
             </span>

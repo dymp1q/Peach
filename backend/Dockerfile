@@ -3,7 +3,7 @@
 # --- builder: resolve dependencies into a self-contained virtualenv ---
 FROM python:3.14-slim AS builder
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.12.21 /uv /usr/local/bin/uv
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -64,7 +64,7 @@ CMD ["./scripts/entrypoint.sh"]
 # the locked dependencies are installed straight into the task root instead.
 FROM public.ecr.aws/lambda/python:3.14 AS lambda
 
-RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/bin/uv \
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     uv export --frozen --no-dev --no-hashes --no-emit-project -o /tmp/requirements.txt \

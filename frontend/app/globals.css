@@ -56,6 +56,17 @@
   --color-tint-green-foreground: var(--tint-green-foreground);
   --color-tint-gray: var(--tint-gray);
 
+  /* Spry reference (Lab 1): pale green boundary panels and coloured card
+     accents, plus week-over-week trend colours. */
+  --color-panel: var(--panel);
+  --color-panel-border: var(--panel-border);
+  --color-accent-green: var(--accent-green);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-gray: var(--accent-gray);
+  --color-trend-up: var(--trend-up);
+  --color-trend-down: var(--trend-down);
+
   /* Status marks in charts. Validated with the dataviz palette checker in
      both modes; "todo" is a deliberate neutral. */
   --color-status-todo: var(--status-todo);
@@ -81,39 +92,39 @@
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #191918;
-  --card: #ffffff;
-  --card-foreground: #191918;
+  --background: #f7faf7;
+  --foreground: #16271b;
+  --card: #fbfdfb;
+  --card-foreground: #16271b;
   --popover: #ffffff;
-  --popover-foreground: #191918;
-  /* Notion's action blue. */
-  --primary: #0075de;
+  --popover-foreground: #16271b;
+  /* Spry's deep green (Lab 1 reference). */
+  --primary: #1f5130;
   --primary-foreground: #ffffff;
-  --secondary: #f6f5f4;
-  --secondary-foreground: #37352f;
-  --muted: #f9f9f8;
-  --muted-foreground: #73726e;
-  --accent: #f1f1ef;
-  --accent-foreground: #191918;
+  --secondary: #e7f2e8;
+  --secondary-foreground: #1f5130;
+  --muted: #eef6ef;
+  --muted-foreground: #5a6b5e;
+  --accent: #e7f2e8;
+  --accent-foreground: #1f5130;
   --destructive: #d44c47;
-  --border: #e9e9e7;
-  --input: #dfdfdc;
-  --ring: #0075de;
-  --chart-1: #0075de;
+  --border: #cfe5d3;
+  --input: #c9e2cd;
+  --ring: #3f9a55;
+  --chart-1: #3f9a55;
   --chart-2: #d9730d;
   --chart-3: #0f7b6c;
   --chart-4: #6940a5;
   --chart-5: #ad1a72;
   --radius: 0.5rem;
-  --sidebar: #f9f9f8;
-  --sidebar-foreground: #191918;
-  --sidebar-primary: #0075de;
+  --sidebar: #eef6ef;
+  --sidebar-foreground: #16271b;
+  --sidebar-primary: #1f5130;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f1f1ef;
-  --sidebar-accent-foreground: #191918;
-  --sidebar-border: #e9e9e7;
-  --sidebar-ring: #0075de;
+  --sidebar-accent: #e7f2e8;
+  --sidebar-accent-foreground: #1f5130;
+  --sidebar-border: #cfe5d3;
+  --sidebar-ring: #3f9a55;
 
   --tint-blue: #f2f9ff;
   --tint-blue-foreground: #005bab;
@@ -123,50 +134,59 @@
   --tint-yellow-foreground: #8a6215;
   --tint-green: #edf3ec;
   --tint-green-foreground: #3f7d5c;
-  --tint-gray: #f9f9f8;
+  --tint-gray: #f3f6f3;
 
   --status-todo: #a5a4a0;
   --status-progress: #2383e2;
-  --status-done: #2e9d5f;
+  --status-done: #3f9a55;
 
   --shadow-tint-weak: rgb(15 15 15 / 0.05);
   --shadow-tint: rgb(15 15 15 / 0.1);
   --shadow-tint-strong: rgb(15 15 15 / 0.2);
-  --selection: rgb(35 131 226 / 0.28);
+  --selection: rgb(63 154 85 / 0.28);
+
+  --panel: #eef7ef;
+  --panel-border: #8fc79a;
+  --accent-green: #3f9a55;
+  --accent-blue: #3b82f6;
+  --accent-purple: #7c3aed;
+  --accent-gray: #9aa89d;
+  --trend-up: #1f7a3a;
+  --trend-down: #c2410c;
 }
 
 .dark {
-  --background: #191919;
+  --background: #121a14;
   --foreground: #ededec;
-  --card: #202020;
+  --card: #18221b;
   --card-foreground: #ededec;
-  --popover: #252525;
+  --popover: #1c271f;
   --popover-foreground: #ededec;
-  --primary: #2383e2;
-  --primary-foreground: #ffffff;
-  --secondary: #2a2a2a;
+  --primary: #6cc283;
+  --primary-foreground: #0f1f14;
+  --secondary: #1f2c22;
   --secondary-foreground: #ededec;
-  --muted: #232323;
+  --muted: #1b261e;
   --muted-foreground: #9b9a97;
-  --accent: #2f2f2f;
+  --accent: #243328;
   --accent-foreground: #ededec;
   --destructive: #ff7369;
-  --border: #2f2f2f;
-  --input: #373737;
-  --ring: #2383e2;
-  --chart-1: #2383e2;
+  --border: #2a3b2e;
+  --input: #324536;
+  --ring: #6cc283;
+  --chart-1: #6cc283;
   --chart-2: #ffa344;
   --chart-3: #4dab9a;
   --chart-4: #9a6dd7;
   --chart-5: #e255a1;
   --sidebar: #202020;
   --sidebar-foreground: #ededec;
-  --sidebar-primary: #2383e2;
+  --sidebar-primary: #6cc283;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #2f2f2f;
   --sidebar-accent-foreground: #ededec;
   --sidebar-border: #2f2f2f;
-  --sidebar-ring: #2383e2;
+  --sidebar-ring: #6cc283;
 
   --tint-blue: #1c2b3d;
   --tint-blue-foreground: #8bbdf0;
@@ -185,7 +205,16 @@
   --shadow-tint-weak: rgb(0 0 0 / 0.2);
   --shadow-tint: rgb(0 0 0 / 0.3);
   --shadow-tint-strong: rgb(0 0 0 / 0.4);
-  --selection: rgb(35 131 226 / 0.4);
+  --selection: rgb(108 194 131 / 0.4);
+
+  --panel: #16211a;
+  --panel-border: #2f5a3a;
+  --accent-green: #6cc283;
+  --accent-blue: #5b8def;
+  --accent-purple: #a78bfa;
+  --accent-gray: #5f6d62;
+  --trend-up: #6cc283;
+  --trend-down: #fb923c;
 }
 
 @layer base {

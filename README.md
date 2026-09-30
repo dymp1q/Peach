@@ -238,6 +238,17 @@ updated_at: datetime
 `description text`, `status varchar(20) not null default 'todo'` (checked to `todo`/`in_progress`/`done`),
 `created_at timestamptz not null default now()`, `updated_at timestamptz not null default now()`.
 
+### Meetings (Spry, public)
+
+| Method | Path | Body | Success |
+|--------|------|------|---------|
+| `GET` | `/api/meetings` | — | `200` `Meeting[]`, ordered by `starts_at` |
+| `POST` | `/api/meetings` | `MeetingCreate` | `201` `Meeting` |
+
+No sign-in needed. `Meeting` is `{id, title, starts_at, ends_at, attendee_count}`, datetimes in
+UTC with a `Z`. The full contract, the table and the page (`/meetings`) are in
+[PROJECT.md](PROJECT.md).
+
 Interactive docs at `/docs` (Swagger) and `/redoc`; the raw schema at `/openapi.json`.
 
 ---

@@ -25,10 +25,12 @@ async function request<T>(
   path: string,
   schema: z.ZodType<T>,
   init?: RequestInit,
+  { auth = true }: { auth?: boolean } = {},
 ): Promise<T> {
-  // Every API route needs a signed-in user; don't send what would bounce.
-  const token = await getIdToken();
-  if (!token) throw new ApiError(401, "You are signed out");
+  // Every /api/v1 route needs a signed-in user; don't send what would bounce.
+  // Public routes (meetings) go out without a token.
+  const token = auth ? await getIdToken() : null;
+  if (auth && !token) throw new ApiError(401, "You are signed out");
 
   let response: Response;
   try {
@@ -37,7 +39,7 @@ async function request<T>(
       cache: "no-store",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -47,7 +49,7 @@ async function request<T>(
 
   // The API no longer accepts this session (revoked, or the pool changed):
   // drop it, and the auth gate sends the user back to the login page.
-  if (response.status === 401) signOut();
+  if (auth && response.status === 401) signOut();
 
   if (!response.ok) {
     const detail = await response
@@ -96,6 +98,29 @@ export const itemInputSchema = z.object({
   status: itemStatusSchema,
 });
 
+// Meetings: public, at /api/meetings (PROJECT.md section 4).
+export const meetingSchema = z.object({
+  id: z.number().int(),
+  title: z.string(),
+  starts_at: z.string(), // ISO 8601, UTC with "Z"
+  ends_at: z.string(),
+  attendee_count: z.number().int(),
+});
+
+export const meetingInputSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title is required")
+    .max(200, "Title is too long"),
+  starts_at: z.string(),
+  ends_at: z.string(),
+  attendee_count: z.number().int().min(1).max(10_000),
+});
+
+export type Meeting = z.infer<typeof meetingSchema>;
+export type MeetingInput = z.infer<typeof meetingInputSchema>;
+
 export type ItemStatus = z.infer<typeof itemStatusSchema>;
 export type Item = z.infer<typeof itemSchema>;
 export type ItemList = z.infer<typeof itemListSchema>;
@@ -129,4 +154,17 @@ export const api = {
 
   deleteItem: (id: string) =>
     request(`/api/v1/items/${id}`, z.undefined(), { method: "DELETE" }),
+
+  listMeetings: () =>
+    request("/api/meetings", z.array(meetingSchema), undefined, {
+      auth: false,
+    }),
+
+  createMeeting: (payload: MeetingInput) =>
+    request(
+      "/api/meetings",
+      meetingSchema,
+      { method: "POST", body: JSON.stringify(payload) },
+      { auth: false },
+    ),
 };
