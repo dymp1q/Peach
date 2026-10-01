@@ -2,7 +2,7 @@ import logging
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.exc import DBAPIError
 
 from app.api.router import api_router
@@ -40,6 +40,11 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(DBAPIError, _database_unavailable)
     app.add_exception_handler(OSError, _database_unavailable)
+
+    @app.get("/", include_in_schema=False)
+    async def root() -> RedirectResponse:
+        """The API has no page of its own: send a visitor to its docs."""
+        return RedirectResponse(url="/docs")
 
     @app.get("/health", tags=["health"], summary="Liveness probe")
     async def health() -> dict[str, str]:
