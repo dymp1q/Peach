@@ -96,14 +96,18 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   log "setting repository variables with gh"
   gh variable set AWS_DEPLOY_ROLE_ARN --repo "${REPO}" --body "${ROLE_ARN}"
   gh variable set AWS_REGION --repo "${REPO}" --body "${AWS_REGION}"
+  # CI has no .env: without this it would deploy a second stack under the
+  # default name instead of updating this project's.
+  gh variable set PROJECT_NAME --repo "${REPO}" --body "${PROJECT_NAME}"
   echo
-  echo "  Done. Write \"deploy\" in a commit message on main and the backend ships."
+  echo "  Done. Every push to main now tests the backend and ships it to ECS."
 else
   echo
-  echo "  gh is not installed or not logged in. Set these two repository"
+  echo "  gh is not installed or not logged in. Set these three repository"
   echo "  variables by hand, under Settings -> Secrets and variables -> Actions:"
   echo
   echo "    AWS_DEPLOY_ROLE_ARN = ${ROLE_ARN}"
   echo "    AWS_REGION          = ${AWS_REGION}"
+  echo "    PROJECT_NAME        = ${PROJECT_NAME}"
   echo
 fi
