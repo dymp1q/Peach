@@ -71,7 +71,7 @@ export function MeetingForm({
   }
 
   return (
-    <Panel title="New meeting" subtitle="Saved through POST /api/meetings">
+    <Panel title="New meeting">
       <form
         onSubmit={submit}
         className="flex flex-col gap-4 rounded-lg border border-l-4 border-l-accent-blue bg-card p-4"
