@@ -233,7 +233,7 @@ if ! aws cloudformation deploy \
   --template-file "${TEMPLATE}" \
   --parameter-overrides \
     "DomainName=${DOMAIN}" \
-    "AcmCertificateArn=${CERT_ARN}" \
+    "CertificateArn=${CERT_ARN}" \
     "HostedZoneId=${ZONE_ID}" \
   --capabilities CAPABILITY_NAMED_IAM \
   --no-fail-on-empty-changeset \
