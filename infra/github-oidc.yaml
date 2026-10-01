@@ -16,8 +16,10 @@ Parameters:
 
   GitHubRepo:
     Type: String
-    Description: owner/repo, e.g. dobosevych/Peach
-    AllowedPattern: "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    Description: >-
+      owner/repo as it appears in the token's subject: dobosevych/Peach, or -
+      for repositories GitHub issues immutable subjects for - owner@id/repo@id.
+    AllowedPattern: "^[A-Za-z0-9_.-]+(@[0-9]+)?/[A-Za-z0-9_.-]+(@[0-9]+)?$"
 
   SubjectClaim:
     Type: String

@@ -46,8 +46,18 @@ fi
 
 SUBJECT_CLAIM="${GITHUB_SUBJECT_CLAIM:-ref:refs/heads/main}"
 
+# Newer repositories get "immutable" OIDC subjects that carry numeric ids -
+# repo:owner@123/name@456:... instead of repo:owner/name:... - and the trust
+# policy has to match the exact form GitHub signs. Ask GitHub which one it is.
+SUBJECT_REPO="${REPO}"
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  PREFIX="$(gh api "repos/${REPO}/actions/oidc/customization/sub" \
+    --jq 'select(.use_immutable_subject == true) | .sub_claim_prefix // empty' 2>/dev/null || true)"
+  [[ -n "${PREFIX}" ]] && SUBJECT_REPO="${PREFIX#repo:}"
+fi
+
 log "repository ${REPO}"
-log "trusting only runs matching repo:${REPO}:${SUBJECT_CLAIM}"
+log "trusting only runs matching repo:${SUBJECT_REPO}:${SUBJECT_CLAIM}"
 
 # --- the account may already have a GitHub provider ---------------------------
 
@@ -70,7 +80,7 @@ if ! aws cloudformation deploy \
   --template-file "${TEMPLATE}" \
   --parameter-overrides \
     "ProjectName=${PROJECT_NAME}" \
-    "GitHubRepo=${REPO}" \
+    "GitHubRepo=${SUBJECT_REPO}" \
     "SubjectClaim=${SUBJECT_CLAIM}" \
     "ExistingProviderArn=${EXISTING_PROVIDER}" \
   --capabilities CAPABILITY_NAMED_IAM \
