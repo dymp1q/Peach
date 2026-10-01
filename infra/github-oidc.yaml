@@ -119,10 +119,6 @@ Resources:
                   - ecr:DescribeImages
                   - ecr:DescribeRepositories
                   - ecr:GetDownloadUrlForLayer
-                  # Lambda grants itself pull access through the repository
-                  # policy when the function is created from an image.
-                  - ecr:GetRepositoryPolicy
-                  - ecr:SetRepositoryPolicy
                   - ecr:InitiateLayerUpload
                   - ecr:PutImage
                   - ecr:PutLifecyclePolicy
@@ -130,8 +126,8 @@ Resources:
                   - ecr:UploadLayerPart
                 Resource: !Sub "arn:aws:ecr:*:${AWS::AccountId}:repository/${ProjectName}-*"
 
-              # CloudFormation creates the function's execution role, and
-              # Lambda needs it passed to it. Both stay inside this project's names.
+              # CloudFormation creates the ECS task execution role, and ECS
+              # needs it passed to it. Both stay inside this project's names.
               - Sid: ProjectRoles
                 Effect: Allow
                 Action:
@@ -164,12 +160,6 @@ Resources:
                   - ec2:RevokeSecurityGroupIngress
                 Resource: "*"
 
-              # Includes lambda:InvokeFunction, which the deploy uses to run
-              # migrations once the new image is live.
-              - Sid: Function
-                Effect: Allow
-                Action: lambda:*
-                Resource: !Sub "arn:aws:lambda:*:${AWS::AccountId}:function:${ProjectName}-*"
 
               - Sid: Database
                 Effect: Allow

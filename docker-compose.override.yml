@@ -21,15 +21,15 @@ services:
   frontend:
     build:
       target: dev
-    command: pnpm dev
+    # Install first: the node_modules volume outlives image rebuilds, so a
+    # dependency added to the lockfile would otherwise never reach it.
+    command: sh -c "pnpm install --frozen-lockfile && pnpm dev"
     environment:
-      NODE_ENV: development
+      CI: "true"
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
-      - frontend_next:/app/.next
 
 volumes:
   backend_venv:
   frontend_node_modules:
-  frontend_next:

@@ -4,12 +4,6 @@ import pytest
 from httpx import AsyncClient
 
 
-@pytest.fixture
-def client(anon_client: AsyncClient) -> AsyncClient:
-    """Meetings need no sign-in: every test here runs without a token."""
-    return anon_client
-
-
 def _meeting(**overrides: Any) -> dict[str, Any]:
     return {
         "title": "Weekly planning",

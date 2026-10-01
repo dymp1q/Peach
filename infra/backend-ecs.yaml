@@ -86,17 +86,6 @@ Parameters:
     Default: "*"
     Description: Comma-separated browser origins; set this to the deployed frontend URL.
 
-  CognitoUserPoolId:
-    Type: String
-    Default: ""
-    Description: >-
-      From make deploy-cognito. Empty means no pool: every /api/v1 endpoint then
-      answers 503, never an open door. Meetings do not need it.
-
-  CognitoClientId:
-    Type: String
-    Default: ""
-
   LogRetentionDays:
     Type: Number
     Default: 7
@@ -292,9 +281,6 @@ Resources:
             - { Name: APP_ENV, Value: !Ref AppEnv }
             - { Name: LOG_LEVEL, Value: !Ref LogLevel }
             - { Name: CORS_ORIGINS, Value: !Ref CorsOrigins }
-            - { Name: COGNITO_REGION, Value: !Ref AWS::Region }
-            - { Name: COGNITO_USER_POOL_ID, Value: !Ref CognitoUserPoolId }
-            - { Name: COGNITO_CLIENT_ID, Value: !Ref CognitoClientId }
           Secrets:
             - Name: DATABASE_URL
               ValueFrom: !Ref DatabaseUrlSecret

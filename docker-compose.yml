@@ -30,11 +30,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://peach:peach@db:5432/peach}
       APP_ENV: ${APP_ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      # From make deploy-cognito. Unset, every /api/v1 route answers 503.
-      COGNITO_REGION: ${COGNITO_REGION:-us-east-1}
-      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
-      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
@@ -49,25 +45,15 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-        NEXT_PUBLIC_COGNITO_REGION: ${COGNITO_REGION:-us-east-1}
-        NEXT_PUBLIC_COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-}
-        NEXT_PUBLIC_COGNITO_DOMAIN: ${COGNITO_DOMAIN:-}
-        NEXT_PUBLIC_COGNITO_GOOGLE_ENABLED: ${COGNITO_GOOGLE_ENABLED:-false}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://backend:8000}
-      NEXT_PUBLIC_COGNITO_REGION: ${COGNITO_REGION:-us-east-1}
-      NEXT_PUBLIC_COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-}
-      NEXT_PUBLIC_COGNITO_DOMAIN: ${COGNITO_DOMAIN:-}
-      NEXT_PUBLIC_COGNITO_GOOGLE_ENABLED: ${COGNITO_GOOGLE_ENABLED:-false}
-      NODE_ENV: production
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-5173}:5173"
     networks: [peach]
 
 volumes:

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Build the Next.js static export and put it behind CloudFront.
+# Build the Vite bundle, sync it to the private S3 bucket, invalidate CloudFront.
 #
-# The API URL is compiled into the bundle - NEXT_PUBLIC_* is substituted at
-# build time, not read at runtime - so this builds against BACKEND_URL from
-# .env, which scripts/deploy-backend.sh writes. Deploy the backend first.
+# The API URL is compiled into the bundle - VITE_* is substituted at build
+# time, not read at runtime - so this builds against BACKEND_URL from .env,
+# which make deploy-backend / make domain-backend write. Backend first.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -55,18 +55,13 @@ fi
 
 # --- which API does this build talk to? -------------------------------------
 
-# NEXT_PUBLIC_API_URL in .env points at localhost for Compose; it is not what a
+# VITE_API_URL in .env points at localhost for Compose; it is not what a
 # deployed bundle should be compiled against. BACKEND_URL is.
 API_URL="${BACKEND_URL:-}"
 API_URL="${API_URL%/}"
 [[ -n "${API_URL}" ]] || die "BACKEND_URL is not set in .env - run make deploy-backend first"
 
 log "building against ${API_URL}"
-
-# The Cognito ids are compiled in too; without them nobody can sign in. The
-# public pages (meetings) still work, so this warns rather than stops.
-[[ -n "${COGNITO_CLIENT_ID:-}" && -n "${COGNITO_DOMAIN:-}" ]] \
-  || warn "COGNITO_CLIENT_ID / COGNITO_DOMAIN are not set - sign-in stays off until make deploy-cognito"
 
 # The ECS backend is plain http:// until make domain-backend gives it a domain
 # and a certificate; browsers block an HTTPS page calling HTTP.
@@ -110,16 +105,10 @@ SITE_URL="$(outputs SiteUrl)"
 log "installing dependencies"
 (cd "${APP}" && "${PM[@]}" install --frozen-lockfile)
 
-log "building the static export"
-rm -rf "${APP}/out"
-(cd "${APP}" && NEXT_OUTPUT=export \
-  NEXT_PUBLIC_API_URL="${API_URL}" \
-  NEXT_PUBLIC_COGNITO_REGION="${COGNITO_REGION:-${AWS_REGION}}" \
-  NEXT_PUBLIC_COGNITO_CLIENT_ID="${COGNITO_CLIENT_ID}" \
-  NEXT_PUBLIC_COGNITO_DOMAIN="${COGNITO_DOMAIN}" \
-  NEXT_PUBLIC_COGNITO_GOOGLE_ENABLED="${COGNITO_GOOGLE_ENABLED:-false}" \
-  "${PM[@]}" build)
-[[ -f "${APP}/out/index.html" ]] || die "the export produced no out/index.html"
+log "building the bundle"
+rm -rf "${APP}/dist"
+(cd "${APP}" && VITE_API_URL="${API_URL}" "${PM[@]}" build)
+[[ -f "${APP}/dist/index.html" ]] || die "the build produced no dist/index.html"
 
 # --- upload -----------------------------------------------------------------
 
@@ -127,15 +116,15 @@ rm -rf "${APP}/out"
 # be asking for the previous build's chunks. They are immutable, so the edge
 # and the browser may keep them forever.
 log "uploading to s3://${BUCKET}"
-aws s3 sync "${APP}/out/_next/static" "s3://${BUCKET}/_next/static" \
+aws s3 sync "${APP}/dist/assets" "s3://${BUCKET}/assets" \
   --cache-control "public,max-age=31536000,immutable" \
   --only-show-errors
 
 # Then everything else, which must never be cached hard or a deploy would not
 # be visible until the TTL expired.
-aws s3 sync "${APP}/out" "s3://${BUCKET}" \
+aws s3 sync "${APP}/dist" "s3://${BUCKET}" \
   --delete \
-  --exclude "_next/static/*" \
+  --exclude "assets/*" \
   --cache-control "public,max-age=0,must-revalidate" \
   --only-show-errors
 
@@ -152,14 +141,10 @@ aws cloudfront wait invalidation-completed \
 
 echo
 echo "  site       ${SITE_URL}"
-echo "  items      ${SITE_URL}/items"
 echo "  api        ${API_URL}"
 echo "  bucket     s3://${BUCKET}"
 echo
 
-echo "If this was the first frontend deploy, run make deploy-cognito again so"
-echo "Google sign-in may redirect back to ${SITE_URL}."
-echo
 echo "Now allow the site's origin through CORS:"
 echo
 echo "  API_CORS_ORIGINS=${SITE_URL}   in .env, then: make deploy-backend"

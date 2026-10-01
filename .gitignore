@@ -11,7 +11,7 @@ htmlcov/
 
 # --- node ---
 node_modules/
-.next/
+dist/
 out/
 .turbo/
 *.tsbuildinfo

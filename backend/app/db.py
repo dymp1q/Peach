@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.pool import NullPool
 
 from app.config import get_settings
 
@@ -18,18 +17,9 @@ class Base(DeclarativeBase):
     """Declarative base shared by every ORM model."""
 
 
-def create_engine() -> AsyncEngine:
-    settings = get_settings()
-    if not settings.db_pooling:
-        return create_async_engine(settings.database_url, echo=False, poolclass=NullPool)
-    return create_async_engine(
-        settings.database_url,
-        echo=False,
-        pool_pre_ping=True,
-    )
-
-
-engine: AsyncEngine = create_engine()
+# pool_pre_ping tests a pooled connection before handing it out, so after the
+# database restarts the pool drops dead connections and reconnects on its own.
+engine: AsyncEngine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
 SessionFactory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 

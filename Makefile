@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-cognito destroy-cognito deploy-backend destroy-backend logs-backend migrate-backend domain-backend deploy-backend-lambda destroy-backend-lambda logs-backend-lambda migrate-backend-lambda cert domain deploy-frontend destroy-frontend github-role
+.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-backend destroy-backend logs-backend migrate-backend domain-backend cert domain deploy-frontend destroy-frontend github-role
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
@@ -51,13 +51,7 @@ shell-backend: ## Shell into the backend container
 shell-db: ## psql into the database
 	$(COMPOSE) exec db psql -U $${POSTGRES_USER:-peach} -d $${POSTGRES_DB:-peach}
 
-deploy-cognito: ## Create/update the Cognito user pool; writes COGNITO_* to .env and prints them
-	./scripts/deploy-cognito.sh
-
-destroy-cognito: ## Delete the Cognito stack, every account in the pool included
-	./scripts/destroy-cognito.sh
-
-# --- backend on ECS (lab 2): ALB -> Fargate -> RDS ---
+# --- backend: ALB -> ECS Fargate -> RDS ---
 
 deploy-backend: ## Build the image, push it to ECR tagged with the commit SHA, roll the ECS service
 	./scripts/deploy-backend-ecs.sh
@@ -75,20 +69,6 @@ migrate-backend: ## Re-run migrations: restart the tasks, whose entrypoint runs 
 	aws ecs update-service --cluster $${PROJECT_NAME:-peach} --service $${PROJECT_NAME:-peach}-backend \
 		--force-new-deployment --query 'service.deployments[0].status' --output text
 
-# --- backend on Lambda (the course template's original path) ---
-
-deploy-backend-lambda: ## Build + push the image, roll the Lambda (function URL + Aurora), migrate, write BACKEND_URL to .env
-	./scripts/deploy-backend.sh
-
-destroy-backend-lambda: ## Delete the Lambda backend stack, Aurora cluster included
-	./scripts/destroy-backend.sh
-
-logs-backend-lambda: ## Tail the Lambda backend's CloudWatch logs
-	aws logs tail /aws/lambda/$${PROJECT_NAME:-peach}-backend --follow --since 10m
-
-migrate-backend-lambda: ## Re-run migrations on the Lambda backend (deploy-backend-lambda already does)
-	aws lambda invoke --function-name $${PROJECT_NAME:-peach}-backend \
-		--cli-binary-format raw-in-base64-out --payload '{"action":"migrate"}' /dev/stdout
 
 cert: ## Request + DNS-validate a us-east-1 certificate for the frontend: make cert DOMAIN=app.example.com
 	./scripts/domain-frontend.sh cert
@@ -96,7 +76,7 @@ cert: ## Request + DNS-validate a us-east-1 certificate for the frontend: make c
 domain: ## Assign a custom domain to the frontend: make domain DOMAIN=app.example.com
 	./scripts/domain-frontend.sh domain
 
-deploy-frontend: ## Build the static export against BACKEND_URL and ship it to S3 + CloudFront
+deploy-frontend: ## Build the Vite bundle against BACKEND_URL, sync to S3, invalidate CloudFront
 	./scripts/deploy-frontend.sh
 
 destroy-frontend: ## Delete the frontend stack (bucket + distribution)

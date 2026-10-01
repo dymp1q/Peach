@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >-
-  Peach frontend on CloudFront: a private S3 bucket holding the Next.js static
+  Peach frontend on CloudFront: a private S3 bucket holding the Vite static
   export, reachable only through the distribution. Deployed by
   scripts/deploy-frontend.sh, which builds the site and syncs it into the bucket.
 
@@ -115,19 +115,16 @@ Resources:
       Name: !Sub "${ProjectName}-frontend-rewrite"
       AutoPublish: true
       FunctionConfig:
-        Comment: Map clean URLs onto the static export's file names
+        Comment: Single-page app - every path without a file extension gets index.html
         Runtime: cloudfront-js-2.0
       FunctionCode: |
         function handler(event) {
           var request = event.request;
           var uri = request.uri;
-          if (uri === '/') {
+          // Vite builds one index.html; /, /meetings or any other page path
+          // is the same app. Real files (assets/*.js, favicon) pass through.
+          if (!uri.split('/').pop().includes('.')) {
             request.uri = '/index.html';
-          } else if (uri.endsWith('/')) {
-            // The export writes items.html, not items/index.html.
-            request.uri = uri.slice(0, -1) + '.html';
-          } else if (!uri.split('/').pop().includes('.')) {
-            request.uri = uri + '.html';
           }
           return request;
         }
@@ -171,13 +168,14 @@ Resources:
               FunctionARN: !GetAtt RewriteFunction.FunctionMetadata.FunctionARN
         CustomErrorResponses:
           # With origin access control a missing key comes back as 403, not 404.
+          # A missing file answers a plain 404 - there is no 404.html to serve.
           - ErrorCode: 403
             ResponseCode: 404
-            ResponsePagePath: /404.html
+            ResponsePagePath: /index.html
             ErrorCachingMinTTL: 10
           - ErrorCode: 404
             ResponseCode: 404
-            ResponsePagePath: /404.html
+            ResponsePagePath: /index.html
             ErrorCachingMinTTL: 10
       Tags:
         - Key: PROJECT_NAME

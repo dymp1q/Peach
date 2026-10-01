@@ -196,8 +196,6 @@ DB_INSTANCE_CLASS="${DB_INSTANCE_CLASS:-}" \
 APP_ENV="${APP_ENV_AWS:-production}" \
 LOG_LEVEL="${LOG_LEVEL:-info}" \
 CORS_ORIGINS="${API_CORS_ORIGINS:-}" \
-COGNITO_USER_POOL_ID="${COGNITO_USER_POOL_ID:-}" \
-COGNITO_CLIENT_ID="${COGNITO_CLIENT_ID:-}" \
 python3 - "${PARAMS_FILE}" <<'PY'
 import json, os, sys
 
@@ -216,8 +214,6 @@ params = {
     "AppEnv": os.environ["APP_ENV"],
     "LogLevel": os.environ["LOG_LEVEL"],
     "CorsOrigins": os.environ["CORS_ORIGINS"],
-    "CognitoUserPoolId": os.environ["COGNITO_USER_POOL_ID"],
-    "CognitoClientId": os.environ["COGNITO_CLIENT_ID"],
 }
 # An empty value means "leave this alone": for an existing stack CloudFormation
 # keeps the current value of any parameter the deploy does not mention - which
