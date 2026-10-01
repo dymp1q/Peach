@@ -100,3 +100,12 @@ async def test_delete_twice_is_404_the_second_time(client: AsyncClient) -> None:
     created = (await client.post("/api/meetings", json=_meeting())).json()
     assert (await client.delete(f"/api/meetings/{created['id']}")).status_code == 204
     assert (await client.delete(f"/api/meetings/{created['id']}")).status_code == 404
+
+
+def test_session_commits_before_the_response_is_sent() -> None:
+    """Regression: a GET right after a 201 must already see the new meeting."""
+    from typing import get_args
+
+    from app.db import SessionDep
+
+    assert get_args(SessionDep)[1].scope == "function"

@@ -44,4 +44,7 @@ async def get_session() -> AsyncIterator[AsyncSession]:
             raise
 
 
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+# scope="function": the session closes - and commits - BEFORE the response is
+# sent. With FastAPI's default ("request") it closes after, so a client that
+# re-reads right after a 201 could get the list without the row it just made.
+SessionDep = Annotated[AsyncSession, Depends(get_session, scope="function")]
