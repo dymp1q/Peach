@@ -15,6 +15,11 @@ const time = new Intl.DateTimeFormat("en-GB", {
   minute: "2-digit",
 });
 
+/** Long titles would stretch the card: over 30 characters, keep 27 + "...". */
+export function shortTitle(title: string): string {
+  return title.length > 30 ? `${title.slice(0, 27)}...` : title;
+}
+
 function formatDuration(start: Date, end: Date): string {
   const minutes = Math.round((end.getTime() - start.getTime()) / 60000);
   const hours = Math.floor(minutes / 60);
@@ -44,7 +49,9 @@ function MeetingCard({
       )}
     >
       <div className="min-w-0">
-        <p className="truncate font-semibold">{meeting.title}</p>
+        <p className="truncate font-semibold" title={meeting.title}>
+          {shortTitle(meeting.title)}
+        </p>
         <p className="text-xs text-muted-foreground">
           {day.format(start)} · {time.format(start)}–{time.format(end)} ·{" "}
           {formatDuration(start, end)}

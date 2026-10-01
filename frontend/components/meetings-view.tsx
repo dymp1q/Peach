@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { MeetingForm } from "@/components/meeting-form";
-import { MeetingList } from "@/components/meeting-list";
+import { MeetingList, shortTitle } from "@/components/meeting-list";
 import { PageHeader } from "@/components/page-header";
 import {
   AlertDialog,
@@ -34,7 +34,7 @@ export function MeetingsView() {
     mutationFn: (input: MeetingInput) => api.createMeeting(input),
     onSuccess: async (meeting) => {
       await queryClient.invalidateQueries({ queryKey: ["meetings"] });
-      toast.success(`Added "${meeting.title}"`);
+      toast.success(`Added "${shortTitle(meeting.title)}"`);
     },
   });
 
@@ -43,7 +43,7 @@ export function MeetingsView() {
     onSuccess: async (_result, meeting) => {
       setPendingDelete(null);
       await queryClient.invalidateQueries({ queryKey: ["meetings"] });
-      toast.success(`Deleted "${meeting.title}"`);
+      toast.success(`Deleted "${shortTitle(meeting.title)}"`);
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -60,7 +60,7 @@ export function MeetingsView() {
         <Skeleton className="h-44 w-full" />
       )}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[340px_1fr]">
+      <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
         <MeetingForm
           onCreate={async (input) => {
             await create.mutateAsync(input);
@@ -82,7 +82,8 @@ export function MeetingsView() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this meeting?</AlertDialogTitle>
             <AlertDialogDescription>
-              &quot;{pendingDelete?.title}&quot; will be removed permanently.
+              &quot;{shortTitle(pendingDelete?.title ?? "")}&quot; will be
+              removed permanently.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
