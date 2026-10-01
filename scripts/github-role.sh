@@ -67,8 +67,18 @@ EXISTING_PROVIDER="$(aws iam list-open-id-connect-providers \
   --output text 2>/dev/null || true)"
 [[ "${EXISTING_PROVIDER}" == "None" ]] && EXISTING_PROVIDER=""
 
+# A provider this stack created itself is not "existing" - passing it in would
+# flip the CreateProvider condition and make CloudFormation delete it on a
+# re-run, leaving GitHub tokens with nothing to validate against.
+OWN_PROVIDER="$(aws cloudformation describe-stack-resource --stack-name "${STACK_NAME}" \
+  --logical-resource-id OidcProvider \
+  --query StackResourceDetail.PhysicalResourceId --output text 2>/dev/null || true)"
+[[ -n "${EXISTING_PROVIDER}" && "${EXISTING_PROVIDER}" == "${OWN_PROVIDER}" ]] && EXISTING_PROVIDER=""
+
 if [[ -n "${EXISTING_PROVIDER}" ]]; then
   log "reusing the GitHub OIDC provider already in this account"
+elif [[ -n "${OWN_PROVIDER}" && "${OWN_PROVIDER}" != "None" ]]; then
+  log "keeping the GitHub OIDC provider this stack created"
 else
   log "this account has no GitHub OIDC provider yet - the stack creates one"
 fi
