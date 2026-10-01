@@ -50,10 +50,7 @@ export function MeetingsView() {
 
   return (
     <div className="grid gap-8">
-      <PageHeader
-        title="Meetings"
-        description="Every meeting on the team calendar, and how this week compares with the last."
-      />
+      <PageHeader title="Meetings" />
 
       {/* Stats depend on today's date, so they render in the browser only,
           once the list has arrived - never baked into the static export. */}
