@@ -8,11 +8,9 @@ import { Button } from "@/components/ui/button";
 import { signOut, useSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-const links = [
-  { href: "/home", label: "Home" },
-  { href: "/items", label: "Board" },
-  { href: "/meetings", label: "Meetings" },
-];
+// Home and Board (the template's tasks) need Cognito sign-in, which lab 2
+// does not use; their pages stay in the code but are left out of the menu.
+const links = [{ href: "/meetings", label: "Meetings" }];
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -22,7 +20,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-8 px-6 sm:px-8">
-        <Link href="/home" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           <span
             aria-hidden
             className="grid size-6 place-items-center rounded-md bg-primary font-heading text-[13px] leading-none font-semibold text-primary-foreground"
@@ -36,7 +34,10 @@ export function SiteHeader() {
 
         <nav className="flex items-center gap-1 text-sm">
           {links.map((link) => {
-            const active = pathname.startsWith(link.href);
+            // "/" shows the meetings page too.
+            const active =
+              pathname.startsWith(link.href) ||
+              (pathname === "/" && link.href === "/meetings");
             return (
               <Link
                 key={link.href}
@@ -71,7 +72,7 @@ export function SiteHeader() {
               size="sm"
               onClick={() => {
                 signOut();
-                router.replace("/");
+                router.replace("/meetings");
               }}
             >
               <LogOut data-icon="inline-start" className="size-4" />

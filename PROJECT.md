@@ -34,6 +34,7 @@ one tree.
   plus this week's numbers compared with last week. Each meeting in the list can be deleted,
   after a confirmation dialog.
 - `docker compose up --build` is the only command a new developer runs (after Docker Desktop).
+- There is **no sign-in** on the site: the lab does not ask for one. `/` opens the meetings page.
 - Meetings need **no sign-in** in this slice. Everything the template already had (items, the
   board, the dashboard, Cognito sign-in, AWS deployment) stays as it is.
 
@@ -82,15 +83,15 @@ Peach/
     ├── Dockerfile              # base / deps / dev / builder / runtime stages
     ├── app/
     │   ├── layout.tsx, globals.css   # root layout; theme tokens (Spry green palette)
-    │   ├── page.tsx, signup/, auth/callback/   # sign-in screens
-    │   ├── (app)/              # signed-in pages behind AuthGate: home, items
-    │   └── (public)/meetings/  # the Spry page: no sign-in needed
+    │   ├── (app)/              # the template's tasks (home, items): behind AuthGate, need
+    │   │                       #   Cognito sign-in, so not in the menu for lab 2
+    │   └── (public)/           # the Spry pages, no sign-in: / and /meetings (same view)
     ├── components/
     │   ├── ui/                 # shadcn/ui primitives — generated, not hand-edited
     │   ├── meetings-view.tsx   # the /meetings page: stats + form + list
     │   ├── week-stats.tsx      # this week vs last week: meetings and hours
     │   ├── meeting-form.tsx, meeting-list.tsx, panel.tsx
-    │   └── ...                 # template components: board, dashboard, header, auth screens
+    │   └── ...                 # template components: board, dashboard, header, auth gate
     ├── lib/
     │   ├── api.ts              # the only place that talks HTTP; zod schemas mirror the API
     │   ├── auth.ts             # Cognito sign-in from the browser, token storage, useSession
