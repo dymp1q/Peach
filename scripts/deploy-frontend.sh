@@ -63,6 +63,25 @@ API_URL="${API_URL%/}"
 
 log "building against ${API_URL}"
 
+# --- and which sign-in? -----------------------------------------------------
+
+# Read from the auth stack's outputs, not copied by hand. No auth stack yet
+# means a build without sign-in: the header simply has no Sign in button.
+AUTH_STACK="${AUTH_STACK_NAME:-${PROJECT_NAME}-auth}"
+auth_output() {
+  aws cloudformation describe-stacks --stack-name "${AUTH_STACK}" \
+    --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text 2>/dev/null || true
+}
+COGNITO_AUTHORITY="$(auth_output Authority)"
+COGNITO_CLIENT_ID="$(auth_output ClientId)"
+COGNITO_DOMAIN="$(auth_output CognitoDomain)"
+if [[ -z "${COGNITO_CLIENT_ID}" || "${COGNITO_CLIENT_ID}" == "None" ]]; then
+  warn "no ${AUTH_STACK} stack - building without sign-in (make deploy-auth adds it)"
+  COGNITO_AUTHORITY="" COGNITO_CLIENT_ID="" COGNITO_DOMAIN=""
+else
+  log "sign-in through ${COGNITO_DOMAIN}"
+fi
+
 # The ECS backend is plain http:// until make domain-backend gives it a domain
 # and a certificate; browsers block an HTTPS page calling HTTP.
 [[ "${API_URL}" == https://* ]] \
@@ -107,7 +126,12 @@ log "installing dependencies"
 
 log "building the bundle"
 rm -rf "${APP}/dist"
-(cd "${APP}" && VITE_API_URL="${API_URL}" "${PM[@]}" build)
+(cd "${APP}" && \
+  VITE_API_URL="${API_URL}" \
+  VITE_COGNITO_AUTHORITY="${COGNITO_AUTHORITY}" \
+  VITE_COGNITO_CLIENT_ID="${COGNITO_CLIENT_ID}" \
+  VITE_COGNITO_DOMAIN="${COGNITO_DOMAIN}" \
+  "${PM[@]}" build)
 [[ -f "${APP}/dist/index.html" ]] || die "the build produced no dist/index.html"
 
 # --- upload -----------------------------------------------------------------

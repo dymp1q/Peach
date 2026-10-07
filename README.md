@@ -79,3 +79,33 @@ or not — tear down when you are done:
 make destroy-backend     # load balancer, ECS, RDS (ECR_TOO=1 also deletes the images)
 make destroy-frontend    # bucket + distribution
 ```
+
+## Sign-in (lab 4)
+
+```
+browser -> app.<domain>/login/ -> Cognito managed login -> (email + password | Google)
+        <- app.<domain>/auth/callback/?code=...  (exchanged with PKCE for Cognito tokens)
+```
+
+Google never talks to the site: the site talks only to Cognito, and Cognito talks to Google.
+`infra/auth.yaml` holds the user pool (Essentials tier, email as the username, self sign-up on),
+the public web client (no secret, code flow), Google as an identity provider, the managed login
+domain (version 2) and its branding.
+
+1. In Google Cloud, create an OAuth client of type *Web application* whose JavaScript origin is
+   `https://<prefix>.auth.<region>.amazoncognito.com` and whose redirect URI is the same plus
+   `/oauth2/idpresponse`. Scopes: `openid email profile`. Publish the app (*In production*), or
+   only its test users can sign in.
+2. Put `COGNITO_DOMAIN_PREFIX`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`. The
+   secret reaches CloudFormation as a NoEcho parameter and never the repository or the bundle.
+3. Deploy:
+
+```bash
+make deploy-auth        # user pool, Google, managed login; callbacks for the site and localhost:5173
+make deploy-frontend    # reads the auth stack's outputs into VITE_COGNITO_*
+```
+
+The frontend uses `react-oidc-context` on top of `oidc-client-ts`. `/login/` calls
+`signinRedirect()` as soon as it loads; the header shows the signed-in email and a Sign out
+button, which clears the local session and sends the browser to Cognito's `/logout`.
+`make destroy-auth` deletes the pool and every user in it.

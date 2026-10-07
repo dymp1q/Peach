@@ -1,4 +1,7 @@
-/** The top bar: the Spry mark and the one page the site has. */
+import { AuthStatus } from "@/components/auth-status";
+import { authEnabled } from "@/lib/auth";
+
+/** The top bar: the Spry mark, the meetings page, and who is signed in. */
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md">
@@ -23,6 +26,11 @@ export function SiteHeader() {
             Meetings
           </a>
         </nav>
+        {authEnabled && (
+          <div className="ml-auto min-w-0">
+            <AuthStatus />
+          </div>
+        )}
       </div>
     </header>
   );

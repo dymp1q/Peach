@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-backend destroy-backend logs-backend migrate-backend domain-backend cert domain deploy-frontend destroy-frontend github-role
+.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-backend destroy-backend logs-backend migrate-backend domain-backend cert domain deploy-frontend destroy-frontend github-role deploy-auth destroy-auth
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
@@ -76,11 +76,19 @@ cert: ## Request + DNS-validate a us-east-1 certificate for the frontend: make c
 domain: ## Assign a custom domain to the frontend: make domain DOMAIN=app.example.com
 	./scripts/domain-frontend.sh domain
 
-deploy-frontend: ## Build the Vite bundle against BACKEND_URL, sync to S3, invalidate CloudFront
+deploy-frontend: ## Build the Vite bundle against BACKEND_URL and the auth stack, sync to S3, invalidate CloudFront
 	./scripts/deploy-frontend.sh
 
 destroy-frontend: ## Delete the frontend stack (bucket + distribution)
 	./scripts/destroy-frontend.sh
+
+# --- sign-in: Cognito user pool + Google (lab 4) ---
+
+deploy-auth: ## Cognito user pool, Google sign-in and managed login; needs GOOGLE_CLIENT_* in .env
+	./scripts/deploy-auth.sh
+
+destroy-auth: ## Delete the Cognito stack and every user in it
+	./scripts/destroy-auth.sh
 
 github-role: ## Create the IAM role GitHub Actions assumes to deploy (OIDC, no keys)
 	./scripts/github-role.sh
