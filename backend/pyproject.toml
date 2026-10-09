@@ -11,6 +11,9 @@ dependencies = [
     "alembic>=1.14",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
+    "tzdata>=2025.2",
+    "awslambdaric>=4.2.0",
+    "boto3>=1.43.110",
 ]
 
 [dependency-groups]
