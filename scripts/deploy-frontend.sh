@@ -82,6 +82,18 @@ else
   log "sign-in through ${COGNITO_DOMAIN}"
 fi
 
+# --- and which agenda parser? (lab 6) ---------------------------------------
+
+AI_STACK="${AI_STACK_NAME:-${PROJECT_NAME}-ai}"
+PARSER_URL="$(aws cloudformation describe-stacks --stack-name "${AI_STACK}" \
+  --query "Stacks[0].Outputs[?OutputKey=='ParserUrl'].OutputValue" --output text 2>/dev/null || true)"
+if [[ -z "${PARSER_URL}" || "${PARSER_URL}" == "None" ]]; then
+  warn "no ${AI_STACK} stack - building without Paste an agenda (make deploy-ai adds it)"
+  PARSER_URL=""
+else
+  log "agenda parser at ${PARSER_URL}"
+fi
+
 # The ECS backend is plain http:// until make domain-backend gives it a domain
 # and a certificate; browsers block an HTTPS page calling HTTP.
 [[ "${API_URL}" == https://* ]] \
@@ -131,6 +143,7 @@ rm -rf "${APP}/dist"
   VITE_COGNITO_AUTHORITY="${COGNITO_AUTHORITY}" \
   VITE_COGNITO_CLIENT_ID="${COGNITO_CLIENT_ID}" \
   VITE_COGNITO_DOMAIN="${COGNITO_DOMAIN}" \
+  VITE_PARSER_URL="${PARSER_URL}" \
   "${PM[@]}" build)
 [[ -f "${APP}/dist/index.html" ]] || die "the build produced no dist/index.html"
 

@@ -12,6 +12,10 @@ async def list_meetings(session: AsyncSession) -> Sequence[Meeting]:
     return result.all()
 
 
+async def get_meeting(session: AsyncSession, meeting_id: int) -> Meeting | None:
+    return await session.get(Meeting, meeting_id)
+
+
 async def create_meeting(session: AsyncSession, payload: MeetingCreate) -> Meeting:
     meeting = Meeting(**payload.model_dump())
     session.add(meeting)

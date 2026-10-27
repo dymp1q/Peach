@@ -109,3 +109,38 @@ The frontend uses `react-oidc-context` on top of `oidc-client-ts`. `/login/` cal
 `signinRedirect()` as soon as it loads; the header shows the signed-in email and a Sign out
 button, which clears the local session and sends the browser to Cognito's `/logout`.
 `make destroy-auth` deletes the pool and every user in it.
+
+## Paste an agenda (lab 6)
+
+```
+parse:  browser --text + Cognito token--> agenda parser (Lambda URL, no VPC) --> Claude on Bedrock
+save:   browser --POST /api/meetings/{id}/agenda--> API (ECS) --> RDS
+```
+
+On a meeting's page (`/meetings/{id}/`), a signed-in user pastes an email or notes and presses
+**Parse**. The parser returns a suggested agenda that fills the normal form. Every field the model
+filled shows a *suggested* badge until the user edits it. **Save** goes through the API like a
+hand-typed agenda, and the API stores the suggestion next to it. Why it is built this way:
+[docs/adr/0006](docs/adr/0006-llm-agenda-parsing.md). The container diagram is in
+[docs/architecture.md](docs/architecture.md).
+
+1. In Bedrock → Model catalog (us-east-1), make sure the Anthropic models are available to the
+   account. The first time, Bedrock asks for a short use-case form.
+2. From your laptop (needs [uv](https://docs.astral.sh/uv/) and AWS credentials):
+
+```bash
+make llm-hello                                   # one call: answer, stop_reason, usage
+make parse TEXT="Пн 10:00, синк по прайсингу..." # the parser's JSON and its usage
+PARSER_MODEL=anthropic.claude-haiku-5-5 make parse TEXT="..."   # the same, ~40x cheaper
+```
+
+3. Deploy. The backend's image must contain `app/ai`, so deploy the backend first:
+
+```bash
+make deploy-backend     # or a push to main
+make deploy-ai          # parser function + URL, and a $5/month budget alarm (BUDGET_EMAIL)
+make deploy-frontend    # reads the parser's URL into VITE_PARSER_URL
+make logs-ai            # one JSON line per parse: user, model, tokens, latency, cost
+```
+
+`make destroy-ai` deletes the parser and the budget.

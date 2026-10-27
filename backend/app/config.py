@@ -21,6 +21,17 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:5173"]
     )
 
+    # Lab 6: the agenda parser. The model is configuration, not code: switching
+    # to anthropic.claude-haiku-5-5 is PARSER_MODEL=... and nothing else.
+    parser_model: str = "anthropic.claude-opus-5-5"
+    # Bedrock serves the Claude models from us-east-1; the rest of Spry can be
+    # elsewhere and still call it there.
+    bedrock_region: str = "us-east-1"
+    # The Cognito user pool the parser trusts (lab 4): its issuer URL and the
+    # web client's id. Both empty means every request is rejected.
+    cognito_issuer: str = ""
+    cognito_client_id: str = ""
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:

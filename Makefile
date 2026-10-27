@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-backend destroy-backend logs-backend migrate-backend domain-backend cert domain deploy-frontend destroy-frontend github-role deploy-auth destroy-auth report-local deploy-reports report-now destroy-reports logs-reports
+.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-backend destroy-backend logs-backend migrate-backend domain-backend cert domain deploy-frontend destroy-frontend github-role deploy-auth destroy-auth report-local deploy-reports report-now destroy-reports logs-reports llm-hello parse deploy-ai destroy-ai logs-ai
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
@@ -106,6 +106,23 @@ destroy-reports: ## Empty the reports bucket and delete the report stack
 
 logs-reports: ## Tail both report functions' logs
 	aws logs tail /aws/lambda/$${PROJECT_NAME:-peach}-report-builder /aws/lambda/$${PROJECT_NAME:-peach}-report-mailer --follow --since 30m
+
+# --- paste an agenda: browser -> parser (Lambda) -> Claude on Bedrock; save -> API (lab 6) ---
+
+llm-hello: ## One call to Claude on Bedrock from this laptop: answer, stop_reason, usage
+	cd backend && uv run --frozen python -m app.ai.hello
+
+parse: ## Parse text from this laptop, print the JSON and usage: make parse TEXT="..."
+	cd backend && uv run --frozen python -m app.ai.agenda "$(TEXT)"
+
+deploy-ai: ## The agenda parser function + URL, and the $5 budget alarm; deploy the backend first
+	./scripts/deploy-ai.sh
+
+destroy-ai: ## Delete the agenda parser stack
+	./scripts/destroy-ai.sh
+
+logs-ai: ## Tail the agenda parser's logs
+	aws logs tail /aws/lambda/$${PROJECT_NAME:-peach}-agenda-parser --follow --since 30m
 
 github-role: ## Create the IAM role GitHub Actions assumes to deploy (OIDC, no keys)
 	./scripts/github-role.sh

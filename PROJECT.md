@@ -33,6 +33,12 @@ one tree.
   week's numbers compared with last week. Each meeting can be deleted after a confirmation.
 - `docker compose up --build` is the only command a new developer runs (after Docker Desktop).
 
+- **Lab 6 — Paste an agenda.** Each meeting has a page (`/meetings/{id}/`) with an agenda: topics
+  (topic, owner, minutes) and action items (task, owner, due date). The user can type it, or paste
+  text that an LLM parser (Claude on Bedrock, a separate Lambda function) turns into a suggestion.
+  The suggestion pre-fills the form, and the user checks it and saves it through the API. See
+  [docs/adr/0006](docs/adr/0006-llm-agenda-parsing.md).
+
 Deliberately **not** in this slice: sign-in, editing meetings, pagination, caches, queues,
 reverse proxies, a second database. The course template's extras (Cognito sign-in, a Lambda
 deploy path, a task board) were removed: nothing in this scope used them.
@@ -55,7 +61,8 @@ Peach/
 ├── infra/                      # CloudFormation
 │   ├── backend-ecs.yaml        # ALB + ECS Fargate + RDS PostgreSQL (+ HTTPS listener, DNS)
 │   ├── frontend.yaml           # private S3 bucket + CloudFront (+ certificate, DNS)
-│   └── github-oidc.yaml        # the role GitHub Actions assumes through OIDC
+│   ├── github-oidc.yaml        # the role GitHub Actions assumes through OIDC
+│   └── ai.yml                  # lab 6: agenda parser Lambda + function URL, $5 budget alarm
 ├── scripts/                    # what the Makefile runs
 │   ├── deploy-backend-ecs.sh   # build -> ECR (tag = commit SHA) -> CloudFormation -> ECS
 │   ├── domain-backend.sh       # ACM certificate + :443 listener for api.<domain>
@@ -71,6 +78,7 @@ Peach/
 │   ├── alembic.ini
 │   ├── scripts/entrypoint.sh   # container start: alembic upgrade head, then uvicorn
 │   ├── app/
+│   │   ├── ai/                 # lab 6: agenda.py (the parser), agenda_lambda.py, auth.py (Cognito JWT)
 │   │   ├── main.py             # app factory: CORS, /health, router, database-error handler
 │   │   ├── config.py           # Settings from environment variables — nothing else reads env
 │   │   ├── db.py               # async engine, session factory, get_session dependency
@@ -78,8 +86,8 @@ Peach/
 │   │   ├── api/routes/         # HTTP layer: meetings, health (readiness)
 │   │   ├── schemas/            # Pydantic models = the wire contract of §4
 │   │   ├── services/           # business logic and queries, no HTTP types
-│   │   └── models/             # SQLAlchemy ORM model: Meeting
-│   ├── migrations/versions/    # 0001-0003 the template's tables, 0004 meetings, 0005 drops the template's
+│   │   └── models/             # SQLAlchemy ORM models: Meeting, Agenda
+│   ├── migrations/versions/    # 0001-0003 the template's tables, 0004 meetings, 0005 drops the template's, 0006 agendas
 │   └── tests/                  # pytest against a real Postgres (a separate *_test database)
 │
 └── frontend/                   # the single-page web client (React + Vite)
@@ -162,6 +170,45 @@ Meeting = MeetingCreate +
 `204` with no body. No such meeting (or already deleted) → `404` `{"detail": "Meeting not found"}`.
 Deletion is permanent.
 
+### `GET /api/meetings/{id}`
+
+`200` `Meeting`; `404` `{"detail": "Meeting not found"}`.
+
+### `GET /api/meetings/{id}/agenda`
+
+`200` `Agenda`; `404` `{"detail": "Agenda not found"}` while the meeting has none.
+
+### `POST /api/meetings/{id}/agenda`
+
+Body `AgendaSave` → `200` `Agenda`, replacing any earlier agenda of the meeting. Invalid body →
+`422`; no such meeting → `404`. This is the only way an agenda is written, whether it was typed
+by hand or started from the parser.
+
+```
+AgendaItem   topic string 1..500 · owner string 1..200 | null · minutes integer 1..480 | null
+ActionItem   task string 1..500  · owner string 1..200 | null · due "YYYY-MM-DD" | null
+
+AgendaSave
+  items              AgendaItem[]   1..50
+  action_items       ActionItem[]   0..50
+  ai_suggestion      object | null  the parser's answer as it came, when the form started from it
+  ai_model           string | null  e.g. "anthropic.claude-opus-5-5"
+  ai_prompt_version  string | null  e.g. "agenda-v1"
+
+Agenda = AgendaSave + meeting_id integer, saved_at datetime (UTC, "Z")
+```
+
+### The agenda parser (lab 6, not under `/api`)
+
+A Lambda function URL (`ParserUrl` output of `infra/ai.yml`, compiled in as `VITE_PARSER_URL`).
+`POST {"text", "today": "YYYY-MM-DD", "tz": "Europe/Kyiv"}` with
+`Authorization: Bearer <Cognito access token>` →
+`200 {"agenda": ParsedAgenda, "model", "prompt_version"}`. Errors: `400` bad body, `401` no valid
+token, `413` text over 10,000 characters, `422` no agenda found, `429` Bedrock is throttling, `502`
+model unavailable. Each error has the shape `{"error": "..."}`.
+`ParsedAgenda` = `title`, `starts_at`, `duration_minutes` (all nullable), `items`,
+`action_items`, `language`. It never writes anything.
+
 If the database is unreachable during a request, any endpoint answers `503`
 `{"detail": "database unavailable"}` instead of a stack trace; `pool_pre_ping` reconnects the pool
 by itself once the database is back.
@@ -179,6 +226,18 @@ Created by migration `0004`:
 | `starts_at`      | `timestamptz`  | not null, indexed                       |
 | `ends_at`        | `timestamptz`  | not null, `CHECK (ends_at > starts_at)` |
 | `attendee_count` | `integer`      | not null, `CHECK (attendee_count >= 1)` |
+
+### `agendas` (migration `0006`)
+
+| column              | type           | constraints                                       |
+|---------------------|----------------|---------------------------------------------------|
+| `meeting_id`        | `integer`      | primary key, FK `meetings.id` `ON DELETE CASCADE` |
+| `items`             | `jsonb`        | not null                                          |
+| `action_items`      | `jsonb`        | not null                                          |
+| `ai_suggestion`     | `jsonb`        | null when typed by hand                           |
+| `ai_model`          | `varchar(100)` |                                                   |
+| `ai_prompt_version` | `varchar(50)`  |                                                   |
+| `saved_at`          | `timestamptz`  | not null, default `now()`                         |
 
 Revisions `0001`–`0003` are the course template's tables; `0005` drops them. They stay in the
 history because databases that already ran them need `0005` to move on.

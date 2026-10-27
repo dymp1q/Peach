@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { CallbackPage, LoginPage } from "@/components/auth-pages";
+import { MeetingPage } from "@/components/meeting-page";
 import { MeetingsView } from "@/components/meetings-view";
 import { PrivacyPage } from "@/components/privacy-page";
 import { Providers } from "@/components/providers";
@@ -8,7 +9,7 @@ import { SiteHeader } from "@/components/site-header";
 import { Toaster } from "@/components/ui/sonner";
 import { CALLBACK_PATH } from "@/lib/auth";
 
-/** The whole app: the meetings page, plus sign-in and privacy. CloudFront
+/** The whole app: the meetings page, one meeting's agenda, sign-in and privacy. CloudFront
  *  serves index.html for every page path, so the path picks the page here. */
 export function App() {
   const path = usePath();
@@ -25,6 +26,8 @@ export function App() {
 }
 
 function Page({ path }: { path: string }) {
+  const meeting = /^\/meetings\/(\d+)\/$/.exec(withSlash(path));
+  if (meeting) return <MeetingPage meetingId={Number(meeting[1])} />;
   switch (withSlash(path)) {
     case "/login/":
       return <LoginPage />;

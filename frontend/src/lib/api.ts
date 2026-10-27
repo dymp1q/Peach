@@ -73,8 +73,43 @@ export const meetingInputSchema = z.object({
   attendee_count: z.number().int().min(1).max(10_000),
 });
 
+export const agendaItemSchema = z.object({
+  topic: z.string(),
+  owner: z.string().nullable().default(null),
+  minutes: z.number().int().nullable().default(null),
+});
+
+export const actionItemSchema = z.object({
+  task: z.string(),
+  owner: z.string().nullable().default(null),
+  due: z.string().nullable().default(null), // YYYY-MM-DD
+});
+
+export const agendaSchema = z.object({
+  meeting_id: z.number().int(),
+  items: z.array(agendaItemSchema),
+  action_items: z.array(actionItemSchema),
+  ai_suggestion: z.record(z.string(), z.unknown()).nullable(),
+  ai_model: z.string().nullable(),
+  ai_prompt_version: z.string().nullable(),
+  saved_at: z.string(),
+});
+
 export type Meeting = z.infer<typeof meetingSchema>;
 export type MeetingInput = z.infer<typeof meetingInputSchema>;
+export type AgendaItem = z.infer<typeof agendaItemSchema>;
+export type ActionItem = z.infer<typeof actionItemSchema>;
+export type Agenda = z.infer<typeof agendaSchema>;
+
+/** The body of POST /api/meetings/{id}/agenda. The ai_* fields carry what
+ *  the parser suggested, when the form started from it. */
+export type AgendaInput = {
+  items: AgendaItem[];
+  action_items: ActionItem[];
+  ai_suggestion?: Record<string, unknown> | null;
+  ai_model?: string | null;
+  ai_prompt_version?: string | null;
+};
 
 /* --- endpoints --- */
 
@@ -89,4 +124,22 @@ export const api = {
 
   deleteMeeting: (id: number) =>
     request(`/api/meetings/${id}`, z.undefined(), { method: "DELETE" }),
+
+  getMeeting: (id: number) => request(`/api/meetings/${id}`, meetingSchema),
+
+  /** null when the meeting has no agenda yet. */
+  getAgenda: async (id: number) => {
+    try {
+      return await request(`/api/meetings/${id}/agenda`, agendaSchema);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  },
+
+  saveAgenda: (id: number, payload: AgendaInput) =>
+    request(`/api/meetings/${id}/agenda`, agendaSchema, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };

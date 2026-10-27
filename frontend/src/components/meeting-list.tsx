@@ -49,9 +49,13 @@ function MeetingCard({
       )}
     >
       <div className="min-w-0">
-        <p className="truncate font-semibold" title={meeting.title}>
+        <a
+          href={`/meetings/${meeting.id}/`}
+          className="block truncate font-semibold hover:text-primary hover:underline"
+          title={`${meeting.title} - open the agenda`}
+        >
           {shortTitle(meeting.title)}
-        </p>
+        </a>
         <p className="text-xs text-muted-foreground">
           {day.format(start)} · {time.format(start)}–{time.format(end)} ·{" "}
           {formatDuration(start, end)}
