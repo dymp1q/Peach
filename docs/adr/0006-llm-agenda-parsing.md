@@ -24,9 +24,14 @@ Constraints:
 
 ## Decision
 
-1. **Model:** Claude Opus 5.5 (`anthropic.claude-opus-5-5`) through Amazon Bedrock's Anthropic
-   Messages API (`bedrock-mantle`, us-east-1) with `effort: low`. The model is configuration
-   (`PARSER_MODEL`), so a cheaper model is one variable away.
+1. **Model:** Kimi K2.5 (`moonshotai.kimi-k2.5`) on Amazon Bedrock (`bedrock-mantle`,
+   us-east-1), through mantle's OpenAI-compatible chat completions signed with the function's
+   IAM role. The lab names Claude Opus 5.5, but this account's Bedrock quotas for every Claude
+   model are 0 (AWS Support case 179328966400503). With the lecturer's permission we picked the
+   model that did best on the step 5 inputs: Kimi K2.5 beat Qwen3 235B, GLM-5, Mistral Large 3,
+   DeepSeek V3.2 and gpt-oss-120b on accuracy and latency. The code keeps the Claude path
+   (Anthropic Messages API, `effort: low`) for any `anthropic.*` model. The model is
+   configuration (`PARSER_MODEL`), so Claude is one variable away once the quotas allow it.
 2. **A structured contract:** the model must answer by calling one tool, `record_agenda`, whose
    input schema is the Pydantic model `ParsedAgenda`. The answer is validated. An invalid answer
    goes back to the model once with the validation error, and a second failure becomes a clear
@@ -55,10 +60,16 @@ Constraints:
 
 ## Consequences
 
-- **Cost per parse,** from the log lines: about 1,500–2,500 input tokens and 300–700 output
-  tokens. That is roughly $0.01–0.02 on Opus 5.5 and $0.0005 on Haiku 5.5. At 20 organisations ×
-  30 parses a week (~2,600 a month) this comes to roughly $25–50/month on Opus, or about $1.30 on
-  Haiku. The interface endpoint we avoided would cost $7.30 even at zero parses.
+- **Cost per parse,** measured on the five step 5 inputs: 400–1,250 input tokens and 20–370
+  output tokens. That averages $0.00075 on Kimi K2.5 ($0.60 / $3.00 per million tokens) and
+  $0.00031 on Qwen3 235B. At 20 organisations × 30 parses a week (~2,600 a month) this comes to
+  about $2/month on Kimi, against an estimated ~$50 on Claude Opus 5.5. The interface endpoint we
+  avoided would cost $7.30/month per AZ even at zero parses.
+- **Accuracy:** on the five inputs Kimi K2.5 invented one value: 13:00 from "after lunch". It
+  ignored the injection. Weekday arithmetic is the weak spot: Qwen put "next Tuesday" on a
+  Wednesday, and Kimi once picked last Monday. The planned agenda-v2 fixes this by giving the
+  prompt a 14-day date → weekday table, letting the code apply the UTC offset from `tz`, and
+  allowing a date without a time.
 - **Logged on every parse:** one JSON line with the user (Cognito `sub`), model, prompt version,
   input and output tokens, latency and estimated cost. The pasted text itself is not logged.
 - **When Bedrock is down or throttling,** the screen says so (429 → "busy", 5xx → "not
