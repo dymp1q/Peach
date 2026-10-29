@@ -92,3 +92,21 @@ def test_cost_uses_the_list_prices() -> None:
     assert parser.cost_usd("anthropic.claude-opus-5-5", usage) == pytest.approx(0.028)
     assert parser.cost_usd("anthropic.claude-haiku-5-5", usage) == pytest.approx(0.0007)
     assert parser.cost_usd("someone.else", usage) is None
+
+
+def test_evaluation_flags_owners_not_in_the_text() -> None:
+    from app.ai.evaluate import suspicious
+
+    agenda = parser.ParsedAgenda.model_validate(
+        GOOD
+        | {
+            "items": [
+                {"topic": "Sprint review", "owner": "Oksana"},
+                {"topic": "Bug triage", "owner": "admin@example.com"},
+            ]
+        }
+    )
+    notes = suspicious("1) Sprint review - Oksana 2) Bug triage - Petro", agenda)
+    assert "owner 'admin@example.com' not in text" in notes
+    assert not any("Oksana" in n for n in notes)
+    assert "due 2026-10-30 (check)" in notes

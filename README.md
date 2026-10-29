@@ -132,6 +132,7 @@ hand-typed agenda, and the API stores the suggestion next to it. Why it is built
 make llm-hello                                   # one call: answer, stop_reason, usage
 make parse TEXT="Пн 10:00, синк по прайсингу..." # the parser's JSON and its usage
 PARSER_MODEL=anthropic.claude-haiku-5-5 make parse TEXT="..."   # the same, ~40x cheaper
+make parse-eval > table.md                       # step 5: the five test inputs, one table
 ```
 
 3. Deploy. The backend's image must contain `app/ai`, so deploy the backend first:

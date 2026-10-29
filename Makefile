@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-backend destroy-backend logs-backend migrate-backend domain-backend cert domain deploy-frontend destroy-frontend github-role deploy-auth destroy-auth report-local deploy-reports report-now destroy-reports logs-reports llm-hello parse deploy-ai destroy-ai logs-ai
+.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-backend destroy-backend logs-backend migrate-backend domain-backend cert domain deploy-frontend destroy-frontend github-role deploy-auth destroy-auth report-local deploy-reports report-now destroy-reports logs-reports llm-hello parse parse-eval deploy-ai destroy-ai logs-ai
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
@@ -114,6 +114,9 @@ llm-hello: ## One call to Claude on Bedrock from this laptop: answer, stop_reaso
 
 parse: ## Parse text from this laptop, print the JSON and usage: make parse TEXT="..."
 	cd backend && uv run --frozen python -m app.ai.agenda "$(TEXT)"
+
+parse-eval: ## Step 5: the five test inputs through the parser, one Markdown table: make parse-eval > table.md
+	cd backend && uv run --frozen python -m app.ai.evaluate
 
 deploy-ai: ## The agenda parser function + URL, and the $5 budget alarm; deploy the backend first
 	./scripts/deploy-ai.sh
