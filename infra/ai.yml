@@ -2,9 +2,10 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >-
   Paste an agenda (lab 6): an LLM parser on the side of Spry.
+  (Kimi K2.5 by default; Claude once the account's quotas allow it.)
 
     browser --POST text + Cognito token--> agenda-parser (Lambda, function URL)
-        --> Claude on Amazon Bedrock (bedrock-mantle, us-east-1) --> JSON back
+        --> a model on Amazon Bedrock (bedrock-mantle, us-east-1) --> JSON back
     browser --POST /api/meetings/{id}/agenda--> API (ECS) --> RDS     (the save)
 
   The parser needs no database, so it runs outside the VPC: it reaches
@@ -24,8 +25,10 @@ Parameters:
 
   ParserModel:
     Type: String
-    Default: anthropic.claude-opus-5-5
-    Description: anthropic.claude-haiku-5-5 is ~40 times cheaper; compare them in step 5.
+    Default: moonshotai.kimi-k2.5
+    Description: >-
+      Any model on bedrock-mantle. anthropic.* goes through the Messages API,
+      the rest through chat completions; this account's Claude quotas are 0.
 
   BedrockRegion:
     Type: String

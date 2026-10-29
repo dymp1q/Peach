@@ -35,7 +35,7 @@ BACKEND_STACK="${BACKEND_STACK_NAME:-${PROJECT_NAME}-backend-ecs}"
 AUTH_STACK="${AUTH_STACK_NAME:-${PROJECT_NAME}-auth}"
 AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
 export AWS_DEFAULT_REGION="${AWS_REGION}"
-PARSER_MODEL="${PARSER_MODEL:-anthropic.claude-opus-5-5}"
+PARSER_MODEL="${PARSER_MODEL:-moonshotai.kimi-k2.5}"
 
 # --- preflight --------------------------------------------------------------
 

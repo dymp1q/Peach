@@ -22,9 +22,14 @@ from datetime import date
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-import anthropic
-
-from app.ai.agenda import PROMPT_VERSION, AgendaParseError, cost_usd, parse_agenda
+from app.ai.agenda import (
+    PROMPT_VERSION,
+    AgendaParseError,
+    ModelBusy,
+    ModelUnavailable,
+    cost_usd,
+    parse_agenda,
+)
 from app.ai.auth import Unauthorized, verify_cognito_token
 from app.config import get_settings
 
@@ -102,10 +107,10 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
         agenda, usage = parse_agenda(text, today, tz)
     except AgendaParseError as e:
         return _error(422, str(e))
-    except anthropic.RateLimitError:
+    except ModelBusy:
         log.warning("bedrock throttled", extra={"fields": {"user": user.sub, "model": model}})
         return _error(429, "the parser is busy, try again in a minute")
-    except anthropic.APIError as e:
+    except ModelUnavailable as e:
         log.error("bedrock failed", extra={"fields": {"user": user.sub, "error": str(e)}})
         return _error(502, "the parser is not available right now")
 

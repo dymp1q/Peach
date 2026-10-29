@@ -21,9 +21,11 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:5173"]
     )
 
-    # Lab 6: the agenda parser. The model is configuration, not code: switching
-    # to anthropic.claude-haiku-5-5 is PARSER_MODEL=... and nothing else.
-    parser_model: str = "anthropic.claude-opus-5-5"
+    # Lab 6: the agenda parser. The model is configuration, not code:
+    # anthropic.* goes through the Messages API, any other bedrock-mantle model
+    # (moonshotai.kimi-k2.5, qwen.qwen3-235b-a22b-2507, ...) through chat
+    # completions. Kimi K2.5 because this account's Claude quotas are 0.
+    parser_model: str = "moonshotai.kimi-k2.5"
     # Bedrock serves the Claude models from us-east-1; the rest of Spry can be
     # elsewhere and still call it there.
     bedrock_region: str = "us-east-1"

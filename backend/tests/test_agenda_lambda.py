@@ -5,14 +5,12 @@ from datetime import date
 from types import SimpleNamespace
 from typing import Any
 
-import anthropic
-import httpx
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from app.ai import agenda_lambda, auth
-from app.ai.agenda import AgendaParseError, ParsedAgenda
+from app.ai.agenda import AgendaParseError, ModelBusy, ModelUnavailable, ParsedAgenda
 from app.config import get_settings
 
 ISSUER = "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_test"
@@ -139,12 +137,13 @@ def test_no_agenda_is_422(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_throttling_is_429(monkeypatch: pytest.MonkeyPatch) -> None:
-    request = httpx.Request("POST", "https://bedrock-mantle.us-east-1.api.aws")
-    error = anthropic.RateLimitError(
-        "slow down", response=httpx.Response(429, request=request), body=None
-    )
-    monkeypatch.setattr(agenda_lambda, "parse_agenda", _raise(error))
+    monkeypatch.setattr(agenda_lambda, "parse_agenda", _raise(ModelBusy("slow down")))
     assert agenda_lambda.handler(_event(BODY))["statusCode"] == 429
+
+
+def test_model_failure_is_502(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(agenda_lambda, "parse_agenda", _raise(ModelUnavailable("403")))
+    assert agenda_lambda.handler(_event(BODY))["statusCode"] == 502
 
 
 def test_text_without_an_agenda_is_422(monkeypatch: pytest.MonkeyPatch, caplog) -> None:
