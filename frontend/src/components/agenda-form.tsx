@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Plus, Save, X } from "lucide-react";
+import { Plus, Save, Sparkles, X } from "lucide-react";
 
 import { Panel } from "@/components/panel";
 import { Button } from "@/components/ui/button";
@@ -54,23 +54,42 @@ export type AgendaSeed = {
   suggestion: ParseResult | null;
 };
 
-/** A text field that shows a "suggested" badge until the user touches it. */
+/** A text field that shows a "suggested" badge until the user touches it.
+ *  Narrow fields (minutes, a date) get a small sparkle instead of the word,
+ *  so the value itself stays readable. */
 function Field({
   suggested,
+  compact,
   className,
   ...props
-}: React.ComponentProps<typeof Input> & { suggested?: boolean }) {
+}: React.ComponentProps<typeof Input> & {
+  suggested?: boolean;
+  compact?: boolean;
+}) {
   return (
     <div className={cn("relative", className)}>
-      <Input {...props} className={cn(suggested && "bg-tint-yellow pr-20")} />
-      {suggested && (
-        <span
-          className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded bg-tint-yellow-foreground/10 px-1.5 py-0.5 text-[10px] font-medium text-tint-yellow-foreground"
-          data-testid="suggested"
-        >
-          suggested
-        </span>
-      )}
+      <Input
+        {...props}
+        className={cn(
+          suggested && "bg-tint-yellow",
+          suggested && (compact ? "pr-7" : "pr-20"),
+        )}
+      />
+      {suggested &&
+        (compact ? (
+          <Sparkles
+            aria-label="suggested"
+            data-testid="suggested"
+            className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-tint-yellow-foreground"
+          />
+        ) : (
+          <span
+            className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded bg-tint-yellow-foreground/10 px-1.5 py-0.5 text-[10px] font-medium text-tint-yellow-foreground"
+            data-testid="suggested"
+          >
+            suggested
+          </span>
+        ))}
     </div>
   );
 }
@@ -223,6 +242,7 @@ export function AgendaForm({
                 value={row.minutes}
                 onChange={editItem(row.key, "minutes")}
                 suggested={row.suggested.minutes}
+                compact
                 placeholder="min"
               />
               <Button
@@ -284,6 +304,7 @@ export function AgendaForm({
                 value={row.due}
                 onChange={editAction(row.key, "due")}
                 suggested={row.suggested.due}
+                compact
               />
               <Button
                 type="button"
