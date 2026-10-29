@@ -1,4 +1,4 @@
-import { CalendarX2, Trash2, Users } from "lucide-react";
+import { CalendarX2, ClipboardList, Trash2, Users } from "lucide-react";
 
 import { Panel } from "@/components/panel";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,15 @@ function MeetingCard({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        <Button variant="outline" size="sm" className="mr-1" asChild>
+          <a
+            href={`/meetings/${meeting.id}/`}
+            aria-label={`Agenda of ${meeting.title}`}
+          >
+            <ClipboardList data-icon="inline-start" className="size-3.5" />
+            Agenda
+          </a>
+        </Button>
         <span
           className="flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground"
           title={`${meeting.attendee_count} attendees`}
