@@ -8,8 +8,10 @@
 # while nobody pastes anything. It never writes; saving goes through the API.
 
 resource "aws_cloudwatch_log_group" "parser" {
-  name              = "/aws/lambda/${var.project_name}-agenda-parser"
-  retention_in_days = 14
+  name = "/aws/lambda/${var.project_name}-agenda-parser"
+  # A month, not two weeks: the cost line of every parse is what ADR 0006's
+  # numbers come from, and a month of them still costs cents.
+  retention_in_days = 30
 }
 
 resource "aws_iam_role" "parser" {
