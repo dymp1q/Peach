@@ -50,6 +50,9 @@ Parameters:
 Resources:
   UserPool:
     Type: AWS::Cognito::UserPool
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       UserPoolName: !Sub "${ProjectName}-users"
       # Managed login needs Essentials; the first 10,000 monthly users are free.
@@ -84,6 +87,9 @@ Resources:
 
   GoogleProvider:
     Type: AWS::Cognito::UserPoolIdentityProvider
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       UserPoolId: !Ref UserPool
       ProviderName: Google
@@ -101,6 +107,9 @@ Resources:
 
   WebClient:
     Type: AWS::Cognito::UserPoolClient
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     # A client that names a provider which does not exist yet fails to create.
     DependsOn: GoogleProvider
     Properties:
@@ -131,6 +140,9 @@ Resources:
 
   Domain:
     Type: AWS::Cognito::UserPoolDomain
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       UserPoolId: !Ref UserPool
       Domain: !Ref DomainPrefix
@@ -140,6 +152,9 @@ Resources:
   # Without a branding a version 2 domain has no sign-in page to show.
   LoginBranding:
     Type: AWS::Cognito::ManagedLoginBranding
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     DependsOn: Domain
     Properties:
       UserPoolId: !Ref UserPool

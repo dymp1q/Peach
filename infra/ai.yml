@@ -57,7 +57,9 @@ Parameters:
 Resources:
   ParserLogGroup:
     Type: AWS::Logs::LogGroup
-    DeletionPolicy: Delete
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       LogGroupName: !Sub "/aws/lambda/${ProjectName}-agenda-parser"
       RetentionInDays: 14
@@ -67,6 +69,9 @@ Resources:
 
   ParserRole:
     Type: AWS::IAM::Role
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -92,6 +97,9 @@ Resources:
 
   ParserFunction:
     Type: AWS::Lambda::Function
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     DependsOn: ParserLogGroup
     Properties:
       FunctionName: !Sub "${ProjectName}-agenda-parser"
@@ -124,6 +132,9 @@ Resources:
   # call it; the handler itself checks the Cognito token and answers 401.
   ParserUrl:
     Type: AWS::Lambda::Url
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TargetFunctionArn: !GetAtt ParserFunction.Arn
       AuthType: NONE
@@ -137,6 +148,9 @@ Resources:
   # URL, the second lets that URL invoke the function.
   ParserUrlPermission:
     Type: AWS::Lambda::Permission
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       FunctionName: !Ref ParserFunction
       Action: lambda:InvokeFunctionUrl
@@ -145,6 +159,9 @@ Resources:
 
   ParserInvokePermission:
     Type: AWS::Lambda::Permission
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       FunctionName: !Ref ParserFunction
       Action: lambda:InvokeFunction
@@ -155,6 +172,9 @@ Resources:
   # bill for the month passes the limit, and another when it is forecast to.
   MonthlyBudget:
     Type: AWS::Budgets::Budget
+    # Lab 7: the stack lets go, Terraform takes over.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Budget:
         BudgetName: !Sub "${ProjectName}-monthly"
