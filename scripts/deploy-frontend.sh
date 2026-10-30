@@ -65,18 +65,17 @@ log "building against ${API_URL}"
 
 # --- and which sign-in? -----------------------------------------------------
 
-# Read from the auth stack's outputs, not copied by hand. No auth stack yet
-# means a build without sign-in: the header simply has no Sign in button.
-AUTH_STACK="${AUTH_STACK_NAME:-${PROJECT_NAME}-auth}"
-auth_output() {
-  aws cloudformation describe-stacks --stack-name "${AUTH_STACK}" \
-    --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text 2>/dev/null || true
+# Read from the Terraform outputs (infra/, state in HCP Terraform), not copied
+# by hand. No outputs yet means a build without sign-in: the header simply has
+# no Sign in button.
+tf_output() {
+  (cd "${ROOT}/infra" && terraform output -raw "$1" 2>/dev/null) || true
 }
-COGNITO_AUTHORITY="$(auth_output Authority)"
-COGNITO_CLIENT_ID="$(auth_output ClientId)"
-COGNITO_DOMAIN="$(auth_output CognitoDomain)"
-if [[ -z "${COGNITO_CLIENT_ID}" || "${COGNITO_CLIENT_ID}" == "None" ]]; then
-  warn "no ${AUTH_STACK} stack - building without sign-in (make deploy-auth adds it)"
+COGNITO_AUTHORITY="$(tf_output authority)"
+COGNITO_CLIENT_ID="$(tf_output client_id)"
+COGNITO_DOMAIN="$(tf_output cognito_domain)"
+if [[ -z "${COGNITO_CLIENT_ID}" ]]; then
+  warn "no Terraform outputs - building without sign-in (make infra-init, then a run in HCP Terraform)"
   COGNITO_AUTHORITY="" COGNITO_CLIENT_ID="" COGNITO_DOMAIN=""
 else
   log "sign-in through ${COGNITO_DOMAIN}"
@@ -84,11 +83,9 @@ fi
 
 # --- and which agenda parser? (lab 6) ---------------------------------------
 
-AI_STACK="${AI_STACK_NAME:-${PROJECT_NAME}-ai}"
-PARSER_URL="$(aws cloudformation describe-stacks --stack-name "${AI_STACK}" \
-  --query "Stacks[0].Outputs[?OutputKey=='ParserUrl'].OutputValue" --output text 2>/dev/null || true)"
-if [[ -z "${PARSER_URL}" || "${PARSER_URL}" == "None" ]]; then
-  warn "no ${AI_STACK} stack - building without Paste an agenda (make deploy-ai adds it)"
+PARSER_URL="$(tf_output parser_url)"
+if [[ -z "${PARSER_URL}" ]]; then
+  warn "no parser_url output - building without Paste an agenda"
   PARSER_URL=""
 else
   log "agenda parser at ${PARSER_URL}"

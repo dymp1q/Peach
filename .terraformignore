@@ -1,0 +1,11 @@
+# What a CLI-driven run in HCP Terraform does not upload: everything but infra/ is
+# sent (the workspace's working directory is infra), so skip the heavy parts.
+.git/
+**/node_modules/
+**/.venv/
+**/__pycache__/
+frontend/dist/
+pgdata/
+.env
+**/.terraform/
+infra/.build/

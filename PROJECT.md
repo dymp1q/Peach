@@ -58,11 +58,18 @@ Peach/
 ├── .github/workflows/
 │   ├── lint.yml                # every push to main and every PR: ruff, eslint, prettier, tsc, vitest
 │   └── deploy-backend.yml      # every push to main: lint + tests, then make deploy-backend
-├── infra/                      # CloudFormation
+├── infra/                      # CloudFormation (*.yaml) and, since lab 7, Terraform (*.tf)
 │   ├── backend-ecs.yaml        # ALB + ECS Fargate + RDS PostgreSQL (+ HTTPS listener, DNS)
 │   ├── frontend.yaml           # private S3 bucket + CloudFront (+ certificate, DNS)
 │   ├── github-oidc.yaml        # the role GitHub Actions assumes through OIDC
-│   └── ai.yml                  # lab 6: agenda parser Lambda + function URL, $5 budget alarm
+│   ├── versions.tf             # lab 7: HCP Terraform workspace ooad-dymp1/spry-dev, providers
+│   ├── variables.tf            # + terraform.tfvars (non-secret values only)
+│   ├── backend.tf              # reads image, VPC, database URL from the backend stack
+│   ├── auth.tf                 # lab 4: Cognito user pool, Google, managed login
+│   ├── reports.tf              # lab 5: bucket, queue + DLQ, builder + mailer, schedule, SES
+│   ├── mailer/index.py         # the mailer function's code
+│   ├── ai.tf                   # lab 6: agenda parser Lambda + function URL, $5 budget alarm
+│   └── outputs.tf              # what the scripts read: terraform output -raw <name>
 ├── scripts/                    # what the Makefile runs
 │   ├── deploy-backend-ecs.sh   # build -> ECR (tag = commit SHA) -> CloudFormation -> ECS
 │   ├── domain-backend.sh       # ACM certificate + :443 listener for api.<domain>
@@ -200,7 +207,7 @@ Agenda = AgendaSave + meeting_id integer, saved_at datetime (UTC, "Z")
 
 ### The agenda parser (lab 6, not under `/api`)
 
-A Lambda function URL (`ParserUrl` output of `infra/ai.yml`, compiled in as `VITE_PARSER_URL`).
+A Lambda function URL (`parser_url` output of `infra/ai.tf`, compiled in as `VITE_PARSER_URL`).
 `POST {"text", "today": "YYYY-MM-DD", "tz": "Europe/Kyiv"}` with
 `Authorization: Bearer <Cognito access token>` →
 `200 {"agenda": ParsedAgenda, "model", "prompt_version"}`. Errors: `400` bad body, `401` no valid

@@ -88,7 +88,7 @@ browser -> app.<domain>/login/ -> Cognito managed login -> (email + password | G
 ```
 
 Google never talks to the site: the site talks only to Cognito, and Cognito talks to Google.
-`infra/auth.yaml` holds the user pool (Essentials tier, email as the username, self sign-up on),
+`infra/auth.tf` holds the user pool (Essentials tier, email as the username, self sign-up on),
 the public web client (no secret, code flow), Google as an identity provider, the managed login
 domain (version 2) and its branding.
 
@@ -96,19 +96,19 @@ domain (version 2) and its branding.
    `https://<prefix>.auth.<region>.amazoncognito.com` and whose redirect URI is the same plus
    `/oauth2/idpresponse`. Scopes: `openid email profile`. Publish the app (*In production*), or
    only its test users can sign in.
-2. Put `COGNITO_DOMAIN_PREFIX`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`. The
-   secret reaches CloudFormation as a NoEcho parameter and never the repository or the bundle.
-3. Deploy:
+2. Put the prefix and the client id in `infra/terraform.tfvars`, and the secret in the HCP
+   Terraform workspace as the sensitive variable `google_client_secret`. It never reaches the
+   repository or the bundle (it does reach the state, see [docs/adr/0007](docs/adr/0007-terraform.md)).
+3. Merge to main; HCP Terraform applies it (see *Infrastructure as code* below). Then:
 
 ```bash
-make deploy-auth        # user pool, Google, managed login; callbacks for the site and localhost:5173
-make deploy-frontend    # reads the auth stack's outputs into VITE_COGNITO_*
+make deploy-frontend    # reads the Terraform outputs into VITE_COGNITO_*
 ```
 
 The frontend uses `react-oidc-context` on top of `oidc-client-ts`. `/login/` calls
 `signinRedirect()` as soon as it loads; the header shows the signed-in email and a Sign out
 button, which clears the local session and sends the browser to Cognito's `/logout`.
-`make destroy-auth` deletes the pool and every user in it.
+The pool has `prevent_destroy`: deleting it would delete every user in it.
 
 ## Paste an agenda (lab 6)
 
@@ -139,9 +139,37 @@ make parse-eval > table.md                       # step 5: the five test inputs,
 
 ```bash
 make deploy-backend     # or a push to main
-make deploy-ai          # parser function + URL, and a $5/month budget alarm (BUDGET_EMAIL)
-make deploy-frontend    # reads the parser's URL into VITE_PARSER_URL
+# the parser function + URL and the $5/month budget alarm are in infra/ai.tf: merge to main
+make deploy-frontend    # reads the parser_url output into VITE_PARSER_URL
 make logs-ai            # one JSON line per parse: user, model, tokens, latency, cost
 ```
 
-`make destroy-ai` deletes the parser and the budget.
+## Infrastructure as code (lab 7)
+
+Sign-in (lab 4), the weekly report (lab 5) and the agenda parser (lab 6) are described in
+Terraform in `infra/*.tf`; until lab 7 they were three CloudFormation stacks. The backend, the
+frontend and the GitHub role are still CloudFormation (`infra/*.yaml`), and `infra/backend.tf`
+reads the image, the VPC and the database URL from the backend stack.
+
+```
+infra/*.tf --pull request--> HCP Terraform: plan as a check --merge--> apply
+                             (workspace ooad-dymp1/spry-dev, AWS role through OIDC, no keys)
+code       --push to main--> GitHub Actions --> ECS (the app road, unchanged)
+```
+
+- The state lives in HCP Terraform, locked during every run. Nobody applies from a laptop:
+  there is no `terraform apply` in the Makefile.
+- Runs assume the role `hcp-terraform-ooad-dymp1` through OIDC (`TFC_AWS_PROVIDER_AUTH`,
+  `TFC_AWS_RUN_ROLE_ARN` in the workspace). The role and its trust are bootstrapped once with
+  a separate local Terraform folder.
+- Secrets are workspace variables marked sensitive (`google_client_secret`); non-secret values
+  are in `infra/terraform.tfvars`.
+
+```bash
+terraform login         # once: an HCP Terraform token in ~/.terraform.d/
+make infra-init         # connect infra/ to the workspace
+make infra-plan         # what would change; changes nothing
+make infra-output       # user pool, client, queue, parser URL - what the scripts read
+```
+
+Why Terraform, and what it costs: [docs/adr/0007](docs/adr/0007-terraform.md).

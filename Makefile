@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-backend destroy-backend logs-backend migrate-backend domain-backend cert domain deploy-frontend destroy-frontend github-role deploy-auth destroy-auth report-local deploy-reports report-now destroy-reports logs-reports llm-hello parse parse-eval deploy-ai destroy-ai logs-ai
+.PHONY: help up down build logs ps migrate revision test test-backend test-frontend lint fmt clean shell-backend shell-db deploy-backend destroy-backend logs-backend migrate-backend domain-backend cert domain deploy-frontend destroy-frontend github-role infra-init infra-plan infra-output report-local report-now logs-reports llm-hello parse parse-eval logs-ai
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
@@ -82,27 +82,26 @@ deploy-frontend: ## Build the Vite bundle against BACKEND_URL and the auth stack
 destroy-frontend: ## Delete the frontend stack (bucket + distribution)
 	./scripts/destroy-frontend.sh
 
-# --- sign-in: Cognito user pool + Google (lab 4) ---
+# --- infrastructure as code: sign-in, weekly report, agenda parser (labs 4-7) ---
+# Described in infra/*.tf, state in HCP Terraform. There is no apply here:
+# a merge to main makes HCP Terraform plan and apply.
 
-deploy-auth: ## Cognito user pool, Google sign-in and managed login; needs GOOGLE_CLIENT_* in .env
-	./scripts/deploy-auth.sh
+infra-init: ## Connect infra/ to the HCP Terraform workspace (terraform login first)
+	cd infra && terraform init
 
-destroy-auth: ## Delete the Cognito stack and every user in it
-	./scripts/destroy-auth.sh
+infra-plan: ## Plan the infrastructure in HCP Terraform and print the diff; changes nothing
+	cd infra && terraform init -input=false >/dev/null && terraform plan
+
+infra-output: ## Print the outputs the scripts read: user pool, client, queue, parser URL
+	cd infra && terraform output
 
 # --- weekly report: schedule -> SQS -> builder -> S3 -> mailer -> SES (lab 5) ---
 
 report-local: ## Print one week's report from the Compose database: make report-local WEEK=2026-W40
 	$(COMPOSE) exec backend python -m app.reports.weekly $(WEEK)
 
-deploy-reports: ## Bucket, queue + DLQ, builder + mailer, Monday schedule, SES; needs REPORT_RECIPIENTS in .env
-	./scripts/deploy-reports.sh
-
 report-now: ## Ask for one week's report now: make report-now WEEK=2026-W39
 	./scripts/report-now.sh
-
-destroy-reports: ## Empty the reports bucket and delete the report stack
-	./scripts/destroy-reports.sh
 
 logs-reports: ## Tail both report functions' logs
 	aws logs tail /aws/lambda/$${PROJECT_NAME:-peach}-report-builder /aws/lambda/$${PROJECT_NAME:-peach}-report-mailer --follow --since 30m
@@ -117,12 +116,6 @@ parse: ## Parse text from this laptop, print the JSON and usage: make parse TEXT
 
 parse-eval: ## Step 5: the five test inputs through the parser, one Markdown table: make parse-eval > table.md
 	cd backend && uv run --frozen python -m app.ai.evaluate
-
-deploy-ai: ## The agenda parser function + URL, and the $5 budget alarm; deploy the backend first
-	./scripts/deploy-ai.sh
-
-destroy-ai: ## Delete the agenda parser stack
-	./scripts/destroy-ai.sh
 
 logs-ai: ## Tail the agenda parser's logs
 	aws logs tail /aws/lambda/$${PROJECT_NAME:-peach}-agenda-parser --follow --since 30m

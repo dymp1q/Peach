@@ -21,15 +21,13 @@ for var in AWS_PROFILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 done
 
 PROJECT_NAME="${PROJECT_NAME:-peach}"
-STACK_NAME="${REPORTS_STACK_NAME:-${PROJECT_NAME}-reports}"
 export AWS_DEFAULT_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
 
 WEEK="${WEEK:-${1:-}}"
 [[ "${WEEK}" =~ ^[0-9]{4}-W[0-9]{2}$ ]] \
   || { echo "usage: make report-now WEEK=2026-W39" >&2; exit 2; }
 
-QUEUE_URL="$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" \
-  --query "Stacks[0].Outputs[?OutputKey=='RequestQueueUrl'].OutputValue" --output text)"
+QUEUE_URL="$(cd "${ROOT}/infra" && terraform output -raw request_queue_url)"
 
 aws sqs send-message --queue-url "${QUEUE_URL}" \
   --message-body "{\"week\": \"${WEEK}\", \"source\": \"report-now\"}" \
